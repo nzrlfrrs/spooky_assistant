@@ -21,6 +21,18 @@ function createDummyTrayIcon() {
   return nativeImage.createFromDataURL(iconBase64);
 }
 
+function applyAutoStart(enabled) {
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: !!enabled,
+      path: process.execPath,
+      args: app.isPackaged ? [] : [app.getAppPath()]
+    });
+  } catch (err) {
+    console.warn('[AutoStart] Failed to update login item:', err.message);
+  }
+}
+
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
@@ -72,6 +84,7 @@ function createWindow() {
   if (cfg.jarvisHandsFree !== false) {
     jarvis.startWakeListener();
   }
+  applyAutoStart(!!cfg.autoStart);
 
   // Tray setup
   try {
@@ -269,9 +282,12 @@ ipcMain.handle('config-get', () => {
 
 ipcMain.handle('config-save', (event, newConfig) => {
   const saved = ConfigManager.saveConfig(newConfig);
-  if (jarvis && saved && saved.config) {
-    if (saved.config.jarvisHandsFree !== false) jarvis.startWakeListener();
-    else jarvis.stopWakeListener();
+  if (saved && saved.config) {
+    if (jarvis) {
+      if (saved.config.jarvisHandsFree !== false) jarvis.startWakeListener();
+      else jarvis.stopWakeListener();
+    }
+    applyAutoStart(!!saved.config.autoStart);
   }
   return saved;
 });

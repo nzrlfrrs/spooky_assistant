@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
   soundEnabled: true,
   ttsEnabled: true,
   jarvisHandsFree: true,
+  autoStart: false,
   nudgeIntervalMinutes: 15
 };
 

@@ -1421,6 +1421,7 @@ async function loadSettings() {
   $('cfgJarvisToggle').checked = cfg.jarvisHandsFree !== false;
   $('cfgTtsToggle').checked = cfg.ttsEnabled !== false;
   $('cfgSoundToggle').checked = cfg.soundEnabled !== false;
+  $('cfgAutoStartToggle').checked = !!cfg.autoStart;
   setSelectedProvider(cfg.aiProvider || 'gemini');
 }
 
@@ -1438,7 +1439,8 @@ $('btnSaveConfig').addEventListener('click', async () => {
     openrouterModel: $('cfgOrModel').value.trim() || 'meta-llama/llama-3.3-70b-instruct:free',
     jarvisHandsFree: $('cfgJarvisToggle').checked,
     ttsEnabled,
-    soundEnabled
+    soundEnabled,
+    autoStart: $('cfgAutoStartToggle').checked
   });
   updateChatPlaceholder();
   ghostHappy();
