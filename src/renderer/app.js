@@ -645,9 +645,11 @@ function renderTasks() {
       `<div class="task-body" title="Klik untuk edit">` +
         `<div class="task-title"></div>` +
         `<div class="task-meta"><span>⏰ ${t.time || '--:--'}</span><span class="t-count">${countdown(t)}</span>` +
-        `${t.fromMeeting ? '<span class="t-from">dari rapat</span>' : ''}</div>` +
+        `${t.fromMeeting ? '<span class="t-from">dari rapat</span>' : ''}` +
+        `${t.fromGCal ? '<span class="t-gcal">📅 GCal</span>' : ''}</div>` +
       `</div>` +
       `<div class="task-actions">` +
+        `${!t.fromGCal ? '<button class="task-gcal" title="Kirim ke Google Calendar">📅</button>' : ''}` +
         `<button class="task-edit" title="Edit tugas">✎</button>` +
         `<button class="task-del" title="Hapus">✕</button>` +
       `</div>` +
@@ -672,6 +674,15 @@ function renderTasks() {
         renderAll();
       }
     });
+    const gcalBtn = card.querySelector('.task-gcal');
+    if (gcalBtn) {
+      gcalBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        playPopSound();
+        await api.openInGoogleCalendar(t);
+        toast(`📅 Membuka Google Calendar untuk "${t.title}"`);
+      });
+    }
     card.querySelector('.task-body').addEventListener('click', () => openEditSheet(t));
     card.querySelector('.task-edit').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1411,6 +1422,34 @@ document.querySelectorAll('#cfgProviderGroup .prio-pill').forEach((btn) => {
   btn.addEventListener('click', () => setSelectedProvider(btn.dataset.provider));
 });
 
+async function runGCalSync(customUrl = null, silent = false) {
+  const btn = $('btnSyncGcalNow');
+  const heroBtn = $('btnHeroSyncGcal');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+  if (heroBtn) heroBtn.disabled = true;
+  try {
+    const res = await api.syncGoogleCalendar(customUrl);
+    if (res && res.success) {
+      tasks = res.tasks || tasks;
+      renderAll();
+      if (!silent) {
+        ghostHappy();
+        toast(`📅 Sinkron berhasil! ${res.count} jadwal Google Calendar dimuat.`);
+      }
+    } else if (!silent) {
+      toast(res?.error || 'Gagal sinkronisasi Google Calendar.');
+    }
+  } catch {
+    if (!silent) toast('Gagal menghubungi Google Calendar.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync'; }
+    if (heroBtn) heroBtn.disabled = false;
+  }
+}
+
+$('btnSyncGcalNow').addEventListener('click', () => runGCalSync($('cfgGcalUrl').value.trim(), false));
+$('btnHeroSyncGcal').addEventListener('click', () => runGCalSync(null, false));
+
 async function loadSettings() {
   const cfg = await api.getConfig();
   $('cfgApiKey').value = cfg.geminiApiKey || '';
@@ -1418,10 +1457,12 @@ async function loadSettings() {
   $('cfgGroqModel').value = cfg.groqModel || 'llama-3.3-70b-versatile';
   $('cfgOrKey').value = cfg.openrouterApiKey || '';
   $('cfgOrModel').value = cfg.openrouterModel || 'meta-llama/llama-3.3-70b-instruct:free';
+  $('cfgGcalUrl').value = cfg.gcalIcsUrl || '';
   $('cfgJarvisToggle').checked = cfg.jarvisHandsFree !== false;
   $('cfgTtsToggle').checked = cfg.ttsEnabled !== false;
   $('cfgSoundToggle').checked = cfg.soundEnabled !== false;
   $('cfgAutoStartToggle').checked = !!cfg.autoStart;
+  $('btnHeroSyncGcal').style.display = cfg.gcalIcsUrl ? 'flex' : 'none';
   setSelectedProvider(cfg.aiProvider || 'gemini');
 }
 
@@ -1429,6 +1470,7 @@ $('btnSaveConfig').addEventListener('click', async () => {
   const cfg = await api.getConfig();
   soundEnabled = $('cfgSoundToggle').checked;
   ttsEnabled = $('cfgTtsToggle').checked;
+  const gcalUrl = $('cfgGcalUrl').value.trim();
   await api.saveConfig({
     ...cfg,
     aiProvider: selectedProvider,
@@ -1437,14 +1479,19 @@ $('btnSaveConfig').addEventListener('click', async () => {
     groqModel: $('cfgGroqModel').value,
     openrouterApiKey: $('cfgOrKey').value.trim(),
     openrouterModel: $('cfgOrModel').value.trim() || 'meta-llama/llama-3.3-70b-instruct:free',
+    gcalIcsUrl: gcalUrl,
     jarvisHandsFree: $('cfgJarvisToggle').checked,
     ttsEnabled,
     soundEnabled,
     autoStart: $('cfgAutoStartToggle').checked
   });
+  $('btnHeroSyncGcal').style.display = gcalUrl ? 'flex' : 'none';
   updateChatPlaceholder();
   ghostHappy();
   toast(`✨ Pengaturan disimpan (Provider: ${selectedProvider.toUpperCase()})`);
+  if (gcalUrl && gcalUrl !== cfg.gcalIcsUrl) {
+    runGCalSync(gcalUrl, false);
+  }
   const b = $('btnSaveConfig');
   b.textContent = 'Tersimpan ✓';
   setTimeout(() => (b.textContent = 'Simpan Pengaturan'), 1600);
@@ -1453,6 +1500,10 @@ $('btnSaveConfig').addEventListener('click', async () => {
 api.getConfig().then((cfg) => {
   selectedProvider = cfg.aiProvider || 'gemini';
   updateChatPlaceholder();
+  if (cfg.gcalIcsUrl) {
+    $('btnHeroSyncGcal').style.display = 'flex';
+    runGCalSync(cfg.gcalIcsUrl, true);
+  }
 }).catch(() => {});
 
 // Dipakai tahap berikutnya (rapat)

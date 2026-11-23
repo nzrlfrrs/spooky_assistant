@@ -5,6 +5,7 @@ const TaskManager = require('./taskManager');
 const AIEngine = require('./aiEngine');
 const ConfigManager = require('./configManager');
 const JarvisController = require('./jarvisController');
+const { fetchGoogleCalendarEvents, buildGoogleCalendarAddUrl } = require('./calendarSync');
 
 // Prevent GPU cache lock contention
 app.commandLine.appendSwitch('disable-gpu-cache');
@@ -169,6 +170,22 @@ ipcMain.handle('task-delete', (event, id) => {
 
 ipcMain.handle('task-parse-ai', async (event, text) => {
   return await AIEngine.parseTaskWithAI(text);
+});
+
+// Google Calendar Sync Handlers
+ipcMain.handle('gcal-sync', async (event, customUrl) => {
+  const cfg = ConfigManager.getConfig();
+  const url = (customUrl != null ? customUrl : cfg.gcalIcsUrl) || '';
+  const res = await fetchGoogleCalendarEvents(url);
+  if (!res.success) return res;
+  const merged = taskManager ? taskManager.mergeGoogleCalendarEvents(res.events) : { count: 0, tasks: [] };
+  return { success: true, count: merged.count, tasks: merged.tasks };
+});
+
+ipcMain.handle('gcal-open-add', async (event, task) => {
+  const url = buildGoogleCalendarAddUrl(task || {});
+  await shell.openExternal(url);
+  return { success: true, url };
 });
 
 // Meeting Notetaker & AI IPC Handlers

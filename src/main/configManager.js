@@ -14,6 +14,7 @@ const DEFAULT_CONFIG = {
   ttsEnabled: true,
   jarvisHandsFree: true,
   autoStart: false,
+  gcalIcsUrl: '',
   nudgeIntervalMinutes: 15
 };
 

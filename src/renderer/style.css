@@ -678,7 +678,7 @@ body.mode-expanded .floating-bubble {
   transition: opacity 0.15s ease;
 }
 .task-card:hover .task-actions { opacity: 1; }
-.task-edit, .task-del {
+.task-edit, .task-del, .task-gcal {
   background: none;
   border: none;
   color: var(--muted);
@@ -688,8 +688,12 @@ body.mode-expanded .floating-bubble {
   border-radius: 6px;
   transition: all 0.15s ease;
 }
+.task-gcal:hover { color: #93c5fd; background: rgba(96, 165, 250, 0.16); }
 .task-edit:hover { color: var(--violet-soft); background: rgba(167, 139, 250, 0.14); }
 .task-del:hover { color: var(--danger); background: rgba(251, 113, 133, 0.14); }
+.t-gcal { color: #93c5fd; font-weight: 600; }
+.gcal-input-row { display: flex; gap: 6px; align-items: center; }
+.today-hero .hero-text { flex: 1; min-width: 0; }
 
 /* Bar waktu terpakai */
 .task-bar {

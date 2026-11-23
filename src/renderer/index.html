@@ -143,6 +143,7 @@
               <div class="hero-title" id="heroTitle">Memuat...</div>
               <div class="hero-sub" id="heroSub"></div>
             </div>
+            <button type="button" class="dash-btn-icon" id="btnHeroSyncGcal" title="Sinkronkan Google Calendar" style="display: none;">🔄</button>
           </section>
 
           <div class="day-strip" id="dayStrip"></div>
@@ -272,6 +273,14 @@
             <div class="setting-item">
               <label class="setting-label" for="cfgApiKey">Gemini API Key <span class="setting-hint">(Audio Rapat & fallback)</span></label>
               <input type="password" id="cfgApiKey" class="glass-input" placeholder="AIzaSy..." />
+            </div>
+
+            <div class="setting-item">
+              <label class="setting-label" for="cfgGcalUrl">📅 Google Calendar iCal URL <span class="setting-hint">(Settings → Integrate calendar → Secret iCal)</span></label>
+              <div class="gcal-input-row">
+                <input type="password" id="cfgGcalUrl" class="glass-input" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" />
+                <button type="button" class="btn-secondary" id="btnSyncGcalNow" title="Tarik jadwal dari Google Calendar sekarang">🔄 Sync</button>
+              </div>
             </div>
 
             <div class="setting-item row">
