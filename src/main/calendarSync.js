@@ -66,7 +66,7 @@ function parseICS(icsText) {
   let current = {};
 
   const now = new Date();
-  const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+  const minDate = now; // Hanya tarik event yang akan datang agar acara lalu tidak dianggap tugas telat
   const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60);
 
   for (const line of lines) {
