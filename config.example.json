@@ -9,5 +9,6 @@
   "ttsEnabled": true,
   "jarvisHandsFree": true,
   "autoStart": false,
+  "gcalIcsUrl": "",
   "nudgeIntervalMinutes": 15
 }
