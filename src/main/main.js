@@ -238,7 +238,10 @@ function buildTaskSummary() {
       .slice(0, 10);
     if (active.length) {
       taskSummary += 'Daftar tugas aktif (diurutkan dari yang paling dekat):\n' +
-        active.map((t) => `- "${t.title}" | Tanggal: ${t.date} | Jam: ${t.time || 'bebas'} | Prioritas: ${t.priority}`).join('\n');
+        active.map((t) =>
+          `- "${t.title}" | Tanggal: ${t.date} | Jam: ${t.time || 'bebas'} | Prioritas: ${t.priority}` +
+          (t.description ? ` | Catatan: ${t.description.slice(0, 120)}` : '')
+        ).join('\n');
     } else {
       taskSummary += 'Daftar tugas aktif: KOSONG (tidak ada tugas atau jadwal apa pun saat ini).';
     }
