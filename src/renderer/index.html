@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spooky - Dynamic Smart Ghost Assistant</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="mode-compact">
+  <div class="ghost-app-container" id="appContainer">
+
+    <!-- ==============================================
+         1. COMPACT FLOATING GHOST VIEW
+         ============================================== -->
+    <div class="compact-view" id="compactView">
+      <!-- Mini Ghost Floating Speech Bubble -->
+      <div class="floating-bubble" id="floatingBubble" style="display: none;">
+        <div class="bubble-header">
+          <span class="bubble-title" id="bubbleTitle">SPOOKY</span>
+          <button class="bubble-close-btn" id="closeBubbleBtn">×</button>
+        </div>
+        <div class="bubble-text" id="bubbleText">Halo! Aku Spooky, siap bantu atur jadwal & notulen meetingmu! 👻✨</div>
+        <div class="bubble-tail"></div>
+      </div>
+
+      <!-- 3D Cute Mini Ghost Character Container (Draggable) -->
+      <div class="ghost-character-drag" id="ghostDragArea" title="Klik: Buka Dashboard | Geser: Pindahkan | Klik Kanan: Menu Cepat">
+        <div class="ghost-mascot" id="ghostMascot">
+          <!-- Floor Shadow with ambient blur -->
+          <div class="ghost-floor-shadow"></div>
+
+          <!-- Ambient Glow Aura -->
+          <div class="ghost-ambient-glow"></div>
+          <span class="wisp w1"></span><span class="wisp w2"></span><span class="wisp w3"></span>
+
+          <!-- 3D Clay-style Mini Ghost SVG -->
+          <svg class="ghost-svg" viewBox="0 0 160 170" id="ghostSvg">
+            <defs>
+              <linearGradient id="ghostLightGrad" x1="30%" y1="0%" x2="70%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff" />
+                <stop offset="55%" stop-color="#ece9fb" />
+                <stop offset="100%" stop-color="#b9b0e0" />
+              </linearGradient>
+              <radialGradient id="headHighlight" cx="38%" cy="28%" r="45%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+              </radialGradient>
+              <filter id="softGlow" x="-25%" y="-25%" width="150%" height="150%">
+                <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgba(167, 139, 250, 0.65)" />
+              </filter>
+            </defs>
+
+            <!-- Tangan mungil -->
+            <ellipse class="ghost-arm arm-l" cx="20" cy="104" rx="9" ry="6" fill="#e4dffa" />
+            <ellipse class="ghost-arm arm-r" cx="140" cy="104" rx="9" ry="6" fill="#e4dffa" />
+
+            <!-- Badan kain sobek; ujung runcing bergoyang tertiup angin -->
+            <path class="ghost-body-path" d="M 80 18 C 48 18 26 42 26 74 C 26 98 18 116 18 134 L 26 154 Q 36 146 46 140 L 54 160 Q 64 146 72 142 L 84 164 Q 94 148 100 142 L 110 158 Q 120 146 126 138 L 136 154 L 142 134 C 142 116 134 98 134 74 C 134 42 112 18 80 18 Z" fill="url(#ghostLightGrad)" stroke="#ece9fb" stroke-width="4" stroke-linejoin="round" filter="url(#softGlow)">
+              <animate attributeName="d" dur="3.2s" repeatCount="indefinite" calcMode="spline"
+                keyTimes="0;0.25;0.5;0.75;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1"
+                values="M 80 18 C 48 18 26 42 26 74 C 26 98 18 116 18 134 L 26 154 Q 36 146 46 140 L 54 160 Q 64 146 72 142 L 84 164 Q 94 148 100 142 L 110 158 Q 120 146 126 138 L 136 154 L 142 134 C 142 116 134 98 134 74 C 134 42 112 18 80 18 Z;M 80 18 C 48 18 26 42 26 74 C 26 98 20 116 22 134 L 32 152 Q 42 146 52 138 L 62 158 Q 72 146 78 140 L 92 162 Q 100 148 106 140 L 116 156 Q 126 144 132 136 L 144 150 L 144 132 C 144 116 134 98 134 74 C 134 42 112 18 80 18 Z;M 80 18 C 48 18 26 42 26 74 C 26 98 18 116 18 134 L 26 154 Q 36 146 46 140 L 54 160 Q 64 146 72 142 L 84 164 Q 94 148 100 142 L 110 158 Q 120 146 126 138 L 136 154 L 142 134 C 142 116 134 98 134 74 C 134 42 112 18 80 18 Z;M 80 18 C 48 18 26 42 26 74 C 26 98 14 118 14 134 L 22 156 Q 32 148 42 142 L 48 162 Q 60 148 68 144 L 78 166 Q 88 150 96 144 L 104 160 Q 114 148 122 140 L 130 158 L 140 136 C 140 118 134 98 134 74 C 134 42 112 18 80 18 Z;M 80 18 C 48 18 26 42 26 74 C 26 98 18 116 18 134 L 26 154 Q 36 146 46 140 L 54 160 Q 64 146 72 142 L 84 164 Q 94 148 100 142 L 110 158 Q 120 146 126 138 L 136 154 L 142 134 C 142 116 134 98 134 74 C 134 42 112 18 80 18 Z" />
+            </path>
+
+            <!-- Kilau kepala -->
+            <ellipse cx="66" cy="42" rx="28" ry="16" fill="url(#headHighlight)" />
+
+            <!-- Mulut: titik kecil polos -->
+            <ellipse id="ghostMouth" cx="80" cy="95" rx="2.4" ry="2" fill="#2a2147" />
+
+            <!-- Headset (mode meeting) -->
+            <g class="meeting-headset" id="meetingHeadset" style="display: none;">
+              <path d="M 26 82 C 26 14 134 14 134 82" fill="none" stroke="#a78bfa" stroke-width="3.5" stroke-linecap="round" filter="drop-shadow(0 0 6px #a78bfa)" />
+              <rect x="19" y="72" width="9" height="20" rx="4.5" fill="#5b21b6" stroke="#a78bfa" stroke-width="1.2" />
+              <rect x="132" y="72" width="9" height="20" rx="4.5" fill="#5b21b6" stroke="#a78bfa" stroke-width="1.2" />
+              <path d="M 24 90 Q 34 108 56 104" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" />
+              <circle cx="57" cy="104" r="2.8" fill="#c4b5fd" filter="drop-shadow(0 0 4px #a78bfa)" />
+            </g>
+          </svg>
+
+          <!-- Large Glossy Black Eyes with Specular Spark Highlights -->
+          <div class="ghost-eyes-row" id="ghostEyesRow">
+            <div class="ghost-eye left-eye" id="eyeLeft">
+              <div class="eye-pupil">
+                <span class="sparkle sp-main"></span>
+                <span class="sparkle sp-sub"></span>
+              </div>
+            </div>
+            <div class="ghost-eye right-eye" id="eyeRight">
+              <div class="eye-pupil">
+                <span class="sparkle sp-main"></span>
+                <span class="sparkle sp-sub"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compact Status Pill Below Ghost -->
+        <div class="ghost-quick-chip" id="ghostQuickChip">
+          <span class="chip-dot"></span>
+          <span class="chip-text" id="chipStatusText">Jadwal Hari Ini</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         2. PANEL DASHBOARD (keluar dari hantu)
+         ============================================== -->
+    <div class="dashboard-drawer" id="dashboardDrawer" style="display: none;">
+      <div class="panel-aura"></div>
+
+      <header class="dash-header">
+        <div class="dash-title-group" id="headerDragHandle" title="Tahan & geser untuk memindahkan">
+          <div class="dash-hello" id="dashHello">Halo!</div>
+          <div class="dash-date" id="dashDate"></div>
+        </div>
+        <div class="dash-controls">
+          <button class="dash-btn-icon" id="collapseDashBtn" title="Kecilkan">–</button>
+          <button class="dash-btn-icon danger" id="closeAppBtn" title="Tutup aplikasi">✕</button>
+        </div>
+      </header>
+
+      <nav class="dash-nav-tabs" id="dashNav">
+        <span class="tab-indicator" id="tabIndicator"></span>
+        <button class="nav-tab active" data-tab="tabTasks"><span class="tab-icon">📜</span><span>Tugas</span></button>
+        <button class="nav-tab" data-tab="tabMeeting"><span class="tab-icon">🎙️</span><span>Rapat</span></button>
+        <button class="nav-tab" data-tab="tabChat"><span class="tab-icon">💬</span><span>Tanya</span></button>
+        <button class="nav-tab" data-tab="tabSettings"><span class="tab-icon">⚙️</span><span>Atur</span></button>
+      </nav>
+
+      <div class="dash-content">
+
+        <!-- ========== TAB: JADWAL & TUGAS ========== -->
+        <div class="tab-pane active" id="tabTasks">
+          <section class="today-hero">
+            <div class="hero-ring">
+              <svg viewBox="0 0 64 64">
+                <circle class="ring-bg" cx="32" cy="32" r="27" />
+                <circle class="ring-fg" id="ringFg" cx="32" cy="32" r="27" />
+              </svg>
+              <div class="ring-label" id="ringLabel">0/0</div>
+            </div>
+            <div class="hero-text">
+              <div class="hero-title" id="heroTitle">Memuat...</div>
+              <div class="hero-sub" id="heroSub"></div>
+            </div>
+          </section>
+
+          <div class="day-strip" id="dayStrip"></div>
+          <input type="date" id="customDatePicker" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;color-scheme:dark;" />
+
+          <div class="task-list" id="taskListContainer"></div>
+
+          <div class="task-add-bar">
+            <button type="button" class="btn-mic-cmd" id="btnAddManual" title="Pilih tanggal & jam manual">📅</button>
+            <input type="text" id="taskNaturalInput" class="glass-input" placeholder='Contoh: "Kumpul tugas 30 Nov jam 2 siang"' />
+            <button class="btn-primary" id="btnAddTask">✨ Tambah</button>
+          </div>
+        </div>
+
+        <!-- ========== TAB: NOTULENSI MEETING ========== -->
+        <div class="tab-pane" id="tabMeeting">
+          <div class="meeting-control-card">
+            <div class="meeting-status-row">
+              <div class="meeting-live-badge" id="meetingBadge">
+                <span class="rec-dot"></span>
+                <span id="meetingStatusLabel">Siap Merekam</span>
+              </div>
+              <div class="meeting-timer" id="meetingTimer">00:00</div>
+            </div>
+
+            <div class="audio-source-row" id="audioSourceRow">
+              <button type="button" class="source-pill active" data-source="mic">🎙️ Mikrofon (Offline)</button>
+              <button type="button" class="source-pill" data-source="both">🖥️ Sistem + Mic (Zoom/Meet)</button>
+            </div>
+
+            <canvas class="audio-wave-canvas" id="audioWaveCanvas" width="380" height="45"></canvas>
+            <div class="meeting-actions-row">
+              <button class="btn-rec" id="btnToggleRecord">
+                <span class="rec-icon" id="btnRecIcon">🎙️</span>
+                <span id="btnRecLabel">Mulai Rekam Meeting</span>
+              </button>
+              <button class="btn-secondary" id="btnGenerateMoM"><span>⚡</span> Buat Notulensi</button>
+            </div>
+          </div>
+
+          <div class="transcript-section">
+            <div class="section-label-row">
+              <span>Transkrip rapat (otomatis dari audio / tempel teks)</span>
+              <button class="btn-link" id="btnClearTranscript">Bersihkan</button>
+            </div>
+            <textarea id="transcriptInput" class="glass-textarea" placeholder="Rekam suara meeting lalu klik Stop untuk transkrip & notulensi otomatis, atau tempel teks rapatmu di sini..."></textarea>
+          </div>
+
+          <div class="mom-output-card" id="momOutputCard" style="display: none;">
+            <div class="mom-header">
+              <div class="mom-title">📋 HASIL NOTULENSI (MoM)</div>
+              <div class="mom-header-btns">
+                <button class="btn-chip" id="btnCopyMoM">📋 Salin</button>
+              </div>
+            </div>
+            <div class="mom-file-bar" id="momFileBar" style="display: none;">
+              <span class="mom-file-name" id="momFileName">Notulensi.md</span>
+              <div class="mom-file-actions">
+                <button class="btn-chip" id="btnOpenMoMFile">📂 Buka File</button>
+                <button class="btn-chip" id="btnOpenMoMFolder">📁 Folder</button>
+              </div>
+            </div>
+            <div class="mom-block"><div class="mom-subheading">📌 Ringkasan</div><div class="mom-text" id="momSummary"></div></div>
+            <div class="mom-block"><div class="mom-subheading">💡 Poin utama</div><ul class="mom-list" id="momKeyPoints"></ul></div>
+            <div class="mom-block"><div class="mom-subheading">✅ Action items</div><div class="action-items-list" id="momActionItems"></div></div>
+            <div class="mom-block"><div class="mom-subheading">🔮 Saran & tindak lanjut AI</div><ul class="mom-list suggestions" id="momSuggestions"></ul></div>
+          </div>
+        </div>
+
+        <!-- ========== TAB: TANYA SPOOKY ========== -->
+        <div class="tab-pane" id="tabChat">
+          <div class="chat-history" id="chatHistory">
+            <div class="chat-msg bot"><div class="msg-bubble">Haii! Aku Spooky 👻 Lagi santai atau lagi sibuk nih? Ngobrol yuk!</div></div>
+          </div>
+          <div class="quick-prompts-row">
+            <span class="prompt-chip" data-prompt="Lagi bosen nih, kasih ide kegiatan santai yang seru dong!">Lagi bosen</span>
+            <span class="prompt-chip" data-prompt="Hari ini aku ada jadwal atau tugas apa aja ya?">Cek jadwalku</span>
+            <span class="prompt-chip" data-prompt="Ceritain 1 fakta unik random yang jarang orang tahu!">Fakta unik</span>
+          </div>
+          <div class="chat-input-row">
+            <button type="button" class="btn-mic-cmd" id="btnVoiceCmd" title="Perintah suara ke Spooky">🎙️</button>
+            <input type="text" id="chatInput" placeholder="Ngobrol atau suruh Spooky (misal: buka chrome)..." class="glass-input" />
+            <button class="btn-primary" id="btnSendChat">Kirim</button>
+          </div>
+        </div>
+
+        <!-- ========== TAB: PENGATURAN ========== -->
+        <div class="tab-pane" id="tabSettings">
+          <div class="settings-card">
+            <div class="settings-title">Otak AI & Pengaturan</div>
+
+            <div class="setting-item">
+              <label class="setting-label">Provider Chat AI</label>
+              <div class="prio-group" id="cfgProviderGroup">
+                <button type="button" class="prio-pill active" data-provider="gemini">✨ Gemini</button>
+                <button type="button" class="prio-pill" data-provider="groq">⚡ Groq</button>
+                <button type="button" class="prio-pill" data-provider="openrouter">🌐 OpenRouter</button>
+              </div>
+            </div>
+
+            <div class="provider-fields" id="cfgGroqFields" style="display: none;">
+              <div class="setting-item">
+                <label class="setting-label" for="cfgGroqKey">Groq API Key <span class="setting-hint">(gratis di console.groq.com)</span></label>
+                <input type="password" id="cfgGroqKey" class="glass-input" placeholder="gsk_..." />
+              </div>
+              <div class="setting-item">
+                <label class="setting-label" for="cfgGroqModel">Model Groq</label>
+                <select id="cfgGroqModel" class="glass-input glass-select">
+                  <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Natural & Cerdas)</option>
+                  <option value="llama-3.1-8b-instant">Llama 3.1 8B (Super Kilat)</option>
+                  <option value="qwen/qwen3-32b">Qwen3 32B</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="provider-fields" id="cfgOpenRouterFields" style="display: none;">
+              <div class="setting-item">
+                <label class="setting-label" for="cfgOrKey">OpenRouter API Key <span class="setting-hint">(openrouter.ai)</span></label>
+                <input type="password" id="cfgOrKey" class="glass-input" placeholder="sk-or-..." />
+              </div>
+              <div class="setting-item">
+                <label class="setting-label" for="cfgOrModel">Model OpenRouter</label>
+                <input type="text" id="cfgOrModel" class="glass-input" placeholder="meta-llama/llama-3.3-70b-instruct:free" />
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <label class="setting-label" for="cfgApiKey">Gemini API Key <span class="setting-hint">(Audio Rapat & fallback)</span></label>
+              <input type="password" id="cfgApiKey" class="glass-input" placeholder="AIzaSy..." />
+            </div>
+
+            <div class="setting-item row">
+              <label class="setting-label">🎙️ Panggil "Spooky" tanpa tombol (Jarvis)</label>
+              <label class="switch-toggle"><input type="checkbox" id="cfgJarvisToggle" checked /><span class="slider"></span></label>
+            </div>
+
+            <div class="setting-item row">
+              <label class="setting-label">🗣️ Suara bicara Spooky (TTS)</label>
+              <label class="switch-toggle"><input type="checkbox" id="cfgTtsToggle" checked /><span class="slider"></span></label>
+            </div>
+
+            <div class="setting-item row">
+              <label class="setting-label">🔔 Efek suara & pengingat</label>
+              <label class="switch-toggle"><input type="checkbox" id="cfgSoundToggle" checked /><span class="slider"></span></label>
+            </div>
+
+            <button class="btn-primary full-width" id="btnSaveConfig">Simpan Pengaturan</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="toast" id="toast"></div>
+
+      <!-- Sheet Edit Tugas -->
+      <div class="edit-sheet-backdrop" id="editSheetBackdrop" style="display: none;">
+        <div class="edit-sheet" id="editSheet">
+          <div class="edit-sheet-header">
+            <span class="edit-sheet-title" id="editSheetTitle">✎ Edit Tugas</span>
+            <button class="dash-btn-icon" id="btnCloseEdit" title="Batal">✕</button>
+          </div>
+          <div class="edit-field">
+            <label class="setting-label" for="editTaskTitle">Judul tugas</label>
+            <input type="text" id="editTaskTitle" class="glass-input" placeholder="Nama tugas..." />
+          </div>
+          <div class="edit-row-2">
+            <div class="edit-field">
+              <label class="setting-label" for="editTaskDate">Tanggal</label>
+              <input type="date" id="editTaskDate" class="glass-input" />
+            </div>
+            <div class="edit-field">
+              <label class="setting-label" for="editTaskTime">Jam</label>
+              <input type="time" id="editTaskTime" class="glass-input" />
+            </div>
+          </div>
+          <div class="edit-field">
+            <label class="setting-label">Prioritas</label>
+            <div class="prio-group" id="editPrioGroup">
+              <button type="button" class="prio-pill" data-prio="low">Rendah</button>
+              <button type="button" class="prio-pill" data-prio="medium">Sedang</button>
+              <button type="button" class="prio-pill" data-prio="high">Tinggi</button>
+            </div>
+          </div>
+          <div class="edit-sheet-actions">
+            <button type="button" class="btn-secondary" id="btnCancelEdit">Batal</button>
+            <button type="button" class="btn-primary" id="btnSaveEdit">Simpan Perubahan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

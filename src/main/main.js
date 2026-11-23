@@ -1,0 +1,326 @@
+const { app, BrowserWindow, ipcMain, screen, nativeImage, Tray, Menu, shell, globalShortcut } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const TaskManager = require('./taskManager');
+const AIEngine = require('./aiEngine');
+const ConfigManager = require('./configManager');
+const JarvisController = require('./jarvisController');
+
+// Prevent GPU cache lock contention
+app.commandLine.appendSwitch('disable-gpu-cache');
+app.commandLine.appendSwitch('disable-http-cache');
+
+let mainWindow = null;
+let taskManager = null;
+let jarvis = null;
+let tray = null;
+let currentWindowMode = 'compact'; // 'compact' | 'expanded'
+
+function createDummyTrayIcon() {
+  const iconBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAA0SURBVDhPY2AYBeMAsgQGB4f/UIwN4FI86v6PA5BhGDB4uNEMgBvG4fT/j0M/YfD/0QxAAQBwWw9R1j2+kAAAAABJRU5ErkJggg==';
+  return nativeImage.createFromDataURL(iconBase64);
+}
+
+function createWindow() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+  const winWidth = 460;
+  const winHeight = 680;
+
+  // Initial placement at bottom right above taskbar
+  const posX = Math.max(0, screenWidth - winWidth - 25);
+  const posY = Math.max(0, screenHeight - winHeight - 25);
+
+  mainWindow = new BrowserWindow({
+    width: winWidth,
+    height: winHeight,
+    x: posX,
+    y: posY,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false
+    }
+  });
+
+  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  mainWindow.setAlwaysOnTop(true, 'screen-saver');
+
+  // Initialize TaskManager
+  taskManager = new TaskManager(path.join(__dirname, '../../tasks.json'));
+  taskManager.on('reminder', (reminder) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('task-reminder', reminder);
+    }
+  });
+
+  // Initialize Jarvis Hands-Free Wake Word Listener ("Spooky")
+  jarvis = new JarvisController();
+  jarvis.on('wake', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('jarvis-wake', data);
+    }
+  });
+  const cfg = ConfigManager.getConfig();
+  if (cfg.jarvisHandsFree !== false) {
+    jarvis.startWakeListener();
+  }
+
+  // Tray setup
+  try {
+    const icon = createDummyTrayIcon();
+    tray = new Tray(icon);
+    updateTrayMenu();
+    tray.setToolTip('Spooky - Mini Ghost AI Assistant & Notetaker');
+  } catch (err) {
+    console.warn('[Tray] Failed to initialize tray:', err.message);
+  }
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Spooky - Smart Ghost Assistant', enabled: false },
+    { type: 'separator' },
+    {
+      label: 'Buka Dashboard',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.webContents.send('expand-dashboard');
+        }
+      }
+    },
+    {
+      label: 'Posisikan ke Pojok Kanan Bawah',
+      click: () => {
+        if (mainWindow) {
+          const primaryDisplay = screen.getPrimaryDisplay();
+          const { width, height } = primaryDisplay.workAreaSize;
+          const [w, h] = mainWindow.getSize();
+          mainWindow.setPosition(Math.max(0, width - w - 25), Math.max(0, height - h - 25));
+        }
+      }
+    },
+    { type: 'separator' },
+    { label: 'Keluar', click: () => app.quit() }
+  ]);
+  tray.setContextMenu(contextMenu);
+}
+
+// Window movement handlers
+ipcMain.handle('get-window-pos', () => {
+  if (mainWindow) return mainWindow.getPosition();
+  return [0, 0];
+});
+
+ipcMain.on('set-window-pos', (event, { x, y }) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setPosition(Math.round(x), Math.round(y));
+  }
+});
+
+// Window resize handler (Compact floating ghost vs Expanded dashboard)
+ipcMain.on('set-window-mode', (event, mode) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  currentWindowMode = mode;
+  // Renderer manages layout smoothly within transparent window bounds
+});
+
+// Task Manager IPC Handlers
+ipcMain.handle('task-get', () => {
+  return taskManager ? taskManager.getTasks() : [];
+});
+
+ipcMain.handle('task-add', (event, taskData) => {
+  return taskManager ? taskManager.addTask(taskData) : null;
+});
+
+ipcMain.handle('task-toggle', (event, id) => {
+  return taskManager ? taskManager.toggleTask(id) : null;
+});
+
+ipcMain.handle('task-update', (event, { id, updates }) => {
+  return taskManager ? taskManager.updateTask(id, updates) : null;
+});
+
+ipcMain.handle('task-delete', (event, id) => {
+  return taskManager ? taskManager.deleteTask(id) : null;
+});
+
+ipcMain.handle('task-parse-ai', async (event, text) => {
+  return await AIEngine.parseTaskWithAI(text);
+});
+
+// Meeting Notetaker & AI IPC Handlers
+ipcMain.handle('meeting-generate-mom', async (event, transcript) => {
+  return await AIEngine.generateMeetingNotes(transcript);
+});
+
+ipcMain.handle('meeting-analyze-audio', async (event, { audioBase64, mimeType }) => {
+  return await AIEngine.analyzeMeetingAudio(audioBase64, mimeType);
+});
+
+ipcMain.handle('meeting-save-file', (event, { markdown, filename }) => {
+  try {
+    const dir = path.join(__dirname, '../../notulensi');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const safeName = (filename || `Notulensi_${Date.now()}.md`).replace(/[<>:"/\\|?*]/g, '_');
+    const fullPath = path.join(dir, safeName);
+    fs.writeFileSync(fullPath, markdown, 'utf8');
+    return { success: true, filePath: fullPath, fileName: safeName };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('open-file-path', async (event, filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    await shell.openPath(filePath);
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('show-file-in-folder', (event, filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    shell.showItemInFolder(filePath);
+    return true;
+  }
+  return false;
+});
+
+function buildTaskSummary() {
+  const now = new Date();
+  const nowLabel = now.toLocaleString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  let taskSummary = `Waktu sekarang: ${nowLabel}\n`;
+  if (taskManager) {
+    const active = taskManager
+      .getTasks()
+      .filter((t) => !t.completed)
+      .sort((a, b) => new Date(`${a.date}T${a.time || '23:59'}:00`) - new Date(`${b.date}T${b.time || '23:59'}:00`))
+      .slice(0, 10);
+    if (active.length) {
+      taskSummary += 'Daftar tugas aktif (diurutkan dari yang paling dekat):\n' +
+        active.map((t) => `- "${t.title}" | Tanggal: ${t.date} | Jam: ${t.time || 'bebas'} | Prioritas: ${t.priority}`).join('\n');
+    } else {
+      taskSummary += 'Daftar tugas aktif: KOSONG (tidak ada tugas atau jadwal apa pun saat ini).';
+    }
+  }
+  return taskSummary;
+}
+
+ipcMain.handle('ai-ask', async (event, payload) => {
+  const query = typeof payload === 'string' ? payload : payload?.query || '';
+  const history = typeof payload === 'object' && Array.isArray(payload?.history) ? payload.history : [];
+
+  // Cek apakah pesan berupa perintah Jarvis cepat (buka app/web/rekam/tugas)
+  const cmd = AIEngine.detectQuickCommand(query);
+  if (cmd) {
+    if (cmd.intent === 'open_app' || cmd.intent === 'open_url') {
+      const execRes = JarvisController.executeSystemAction(cmd.intent, cmd.target);
+      if (!execRes.ok && execRes.reason) {
+        return { reply: execRes.reason, intent: 'chat', target: '' };
+      }
+    }
+    return cmd;
+  }
+
+  const text = await AIEngine.askAI(query, history, buildTaskSummary());
+  return { reply: text, intent: 'chat', target: '' };
+});
+
+ipcMain.handle('jarvis-process-audio', async (event, { audioBase64, mimeType }) => {
+  const res = await AIEngine.processJarvisAudio(audioBase64, mimeType, buildTaskSummary());
+  if (res && (res.intent === 'open_app' || res.intent === 'open_url')) {
+    const execRes = JarvisController.executeSystemAction(res.intent, res.target);
+    if (!execRes.ok && execRes.reason) {
+      res.reply = execRes.reason;
+    }
+  }
+  // Siapkan audio TTS di backend sebelum kirim balasan agar teks & suara muncul bersamaan (0ms delay)
+  const cfg = ConfigManager.getConfig();
+  if (res && res.reply && cfg.ttsEnabled !== false) {
+    try {
+      res.ttsAudio = await AIEngine.synthesizeCuteVoice(res.reply);
+    } catch {}
+  }
+  return res;
+});
+
+ipcMain.on('jarvis-set-paused', (event, paused) => {
+  if (jarvis) jarvis.setPaused(paused);
+});
+
+ipcMain.handle('tts-synthesize', async (event, text) => {
+  return await AIEngine.synthesizeCuteVoice(text);
+});
+
+// Config Handlers
+ipcMain.handle('config-get', () => {
+  return ConfigManager.getConfig();
+});
+
+ipcMain.handle('config-save', (event, newConfig) => {
+  const saved = ConfigManager.saveConfig(newConfig);
+  if (jarvis && saved && saved.config) {
+    if (saved.config.jarvisHandsFree !== false) jarvis.startWakeListener();
+    else jarvis.stopWakeListener();
+  }
+  return saved;
+});
+
+// Mouse Event Pass-through for transparent Electron window
+ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    win.setIgnoreMouseEvents(ignore, options || { forward: true });
+  }
+});
+
+ipcMain.on('app-close', () => {
+  app.quit();
+});
+
+ipcMain.on('app-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+
+ipcMain.handle('get-version', () => {
+  return app.getVersion();
+});
+
+app.whenReady().then(() => {
+  createWindow();
+
+  // Shortcut cadangan global: Ctrl+Shift+S untuk langsung panggil Jarvis dari app mana saja
+  globalShortcut.register('CommandOrControl+Shift+S', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('jarvis-wake', { raw: 'HOTKEY' });
+    }
+  });
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (jarvis) jarvis.stopWakeListener();
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  if (jarvis) jarvis.stopWakeListener();
+});
