@@ -1,0 +1,22 @@
+{
+  "name": "spooky-assistant",
+  "version": "1.0.0",
+  "description": "Dynamic Mini Ghost AI Assistant, Smart Daily Task Scheduler, Live Meeting Notetaker & Hands-Free Voice Butler",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "desktop-assistant",
+    "ai-companion",
+    "task-scheduler",
+    "meeting-notetaker",
+    "voice-assistant",
+    "electron"
+  ],
+  "author": "Spooky Assistant",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^44.8.0"
+  }
+}
