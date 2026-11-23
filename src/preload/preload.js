@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('ghostAPI', {
   updateTask: (id, updates) => ipcRenderer.invoke('task-update', { id, updates }),
   deleteTask: (id) => ipcRenderer.invoke('task-delete', id),
   parseTaskWithAI: (text) => ipcRenderer.invoke('task-parse-ai', text),
+  syncGoogleCalendar: (customUrl) => ipcRenderer.invoke('gcal-sync', customUrl),
+  openInGoogleCalendar: (task) => ipcRenderer.invoke('gcal-open-add', task),
   onTaskReminder: (callback) => {
     const sub = (event, data) => callback(data);
     ipcRenderer.on('task-reminder', sub);

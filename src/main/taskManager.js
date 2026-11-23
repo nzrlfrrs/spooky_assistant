@@ -137,6 +137,33 @@ class TaskManager extends EventEmitter {
     return null;
   }
 
+  mergeGoogleCalendarEvents(gcalEvents = []) {
+    const existingByUid = new Map();
+    this.tasks.forEach((t) => {
+      if (t.fromGCal && t.gcalUid) existingByUid.set(t.gcalUid, t);
+    });
+
+    const localTasks = this.tasks.filter((t) => !t.fromGCal);
+    const mergedGCal = gcalEvents.map((ev) => {
+      const prev = existingByUid.get(ev.gcalUid);
+      return {
+        id: prev ? prev.id : 'gcal-' + Buffer.from(ev.gcalUid).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 14),
+        title: ev.title,
+        date: ev.date,
+        time: ev.time || '09:00',
+        priority: prev ? prev.priority : 'medium',
+        completed: prev ? !!prev.completed : false,
+        fromGCal: true,
+        gcalUid: ev.gcalUid,
+        createdAt: prev ? prev.createdAt : new Date().toISOString()
+      };
+    });
+
+    this.tasks = [...localTasks, ...mergedGCal];
+    this.saveToFile();
+    return { count: mergedGCal.length, tasks: this.tasks };
+  }
+
   startDeadlineChecker() {
     if (this.checkInterval) clearInterval(this.checkInterval);
     // Check every 60 seconds
