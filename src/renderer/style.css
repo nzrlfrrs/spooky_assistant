@@ -708,6 +708,20 @@ body.mode-expanded .floating-bubble {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.task-desc {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--violet-soft);
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.edit-desc-input {
+  height: 58px;
+  min-height: 46px;
+  max-height: 110px;
+}
 .task-card.urgency-done .task-title { text-decoration: line-through; color: var(--muted); }
 .task-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 10.5px; color: var(--muted); }
 .t-count { color: var(--accent, var(--violet-soft)); font-weight: 700; }

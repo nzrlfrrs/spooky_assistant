@@ -83,6 +83,7 @@ function parseICS(icsText) {
           events.push({
             gcalUid: current.uid || `${current.date}-${current.title}`,
             title: current.title,
+            description: current.description || '',
             date: current.date,
             time: current.time || '09:00',
             priority: 'medium',
@@ -102,6 +103,7 @@ function parseICS(icsText) {
 
     if (key === 'UID') current.uid = value.trim();
     else if (key === 'SUMMARY') current.title = unescapeIcsText(value);
+    else if (key === 'DESCRIPTION') current.description = unescapeIcsText(value);
     else if (key === 'DTSTART') {
       const parsed = parseIcsDate(value);
       if (parsed) {
@@ -145,11 +147,15 @@ function buildGoogleCalendarAddUrl(task) {
     `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}T` +
     `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}00Z`;
 
+  const detailsText = task.description
+    ? `${task.description}\n\n(Dijadwalkan lewat Spooky Assistant • Prioritas: ${task.priority || 'medium'})`
+    : `Dijadwalkan lewat Spooky Assistant (Prioritas: ${task.priority || 'medium'})`;
+
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: title,
     dates: `${fmtUtc(start)}/${fmtUtc(end)}`,
-    details: `Dijadwalkan lewat Spooky Assistant (Prioritas: ${task.priority || 'medium'})`
+    details: detailsText
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }

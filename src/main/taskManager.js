@@ -81,6 +81,7 @@ class TaskManager extends EventEmitter {
     const newTask = {
       id: 'task-' + Date.now(),
       title: taskData.title || 'Tugas Baru',
+      description: typeof taskData.description === 'string' ? taskData.description.trim() : '',
       date: taskData.date || ymd(new Date()),
       time: taskData.time || '18:00',
       priority: taskData.priority || 'medium',
@@ -113,6 +114,9 @@ class TaskManager extends EventEmitter {
 
     if (typeof updates.title === 'string' && updates.title.trim()) {
       task.title = updates.title.trim();
+    }
+    if (typeof updates.description === 'string') {
+      task.description = updates.description.trim();
     }
     if (updates.date) task.date = updates.date;
     if (updates.time) task.time = updates.time;
@@ -149,6 +153,7 @@ class TaskManager extends EventEmitter {
       return {
         id: prev ? prev.id : 'gcal-' + Buffer.from(ev.gcalUid).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 14),
         title: ev.title,
+        description: ev.description || (prev ? prev.description || '' : ''),
         date: ev.date,
         time: ev.time || '09:00',
         priority: prev ? prev.priority : 'medium',

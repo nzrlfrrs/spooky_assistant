@@ -650,8 +650,9 @@ function renderTasks() {
     card.style.setProperty('--i', i);
     card.innerHTML =
       `<button class="task-check" title="Selesai">${t.completed ? '✓' : ''}</button>` +
-      `<div class="task-body" title="Klik untuk edit">` +
+      `<div class="task-body" title="Klik untuk lihat & edit detail">` +
         `<div class="task-title"></div>` +
+        `${t.description ? '<div class="task-desc"></div>' : ''}` +
         `<div class="task-meta"><span>⏰ ${t.time || '--:--'}</span><span class="t-count">${countdown(t)}</span>` +
         `${t.fromMeeting ? '<span class="t-from">dari rapat</span>' : ''}` +
         `${t.fromGCal ? '<span class="t-gcal">📅 GCal</span>' : ''}</div>` +
@@ -663,6 +664,7 @@ function renderTasks() {
       `</div>` +
       `<div class="task-bar"><span style="width:${t.completed ? 100 : timeUsedPct(t)}%"></span></div>`;
     card.querySelector('.task-title').textContent = t.title;
+    if (t.description) card.querySelector('.task-desc').textContent = t.description;
 
     const check = card.querySelector('.task-check');
     check.addEventListener('click', async () => {
@@ -725,6 +727,7 @@ function openEditSheet(task) {
     $('editSheetTitle').textContent = '✎ Edit Tugas';
     $('btnSaveEdit').textContent = 'Simpan Perubahan';
     $('editTaskTitle').value = task.title || '';
+    $('editTaskDesc').value = task.description || '';
     $('editTaskDate').value = task.date || ymd(new Date());
     $('editTaskTime').value = task.time || '18:00';
     setEditPrio(task.priority || 'medium');
@@ -733,6 +736,7 @@ function openEditSheet(task) {
     $('editSheetTitle').textContent = '📅 Tambah Tugas & Tanggal Bebas';
     $('btnSaveEdit').textContent = 'Simpan Tugas';
     $('editTaskTitle').value = $('taskNaturalInput').value.trim();
+    $('editTaskDesc').value = '';
     $('editTaskDate').value = selectedDay !== 'all' ? selectedDay : ymd(new Date());
     $('editTaskTime').value = '18:00';
     setEditPrio('medium');
@@ -757,6 +761,7 @@ async function saveEditSheet() {
   }
   const data = {
     title,
+    description: $('editTaskDesc').value.trim(),
     date: $('editTaskDate').value || ymd(new Date()),
     time: $('editTaskTime').value || '18:00',
     priority: editingPrio
