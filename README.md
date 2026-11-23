@@ -1,31 +1,80 @@
-# 👻 Spooky — Dynamic Mini Ghost AI Assistant
+# Spooky Assistant
 
-Asisten desktop dinamis bertema *haunted glass* dengan karakter hantu mini interaktif untuk membantu mengatur jadwal tugas harian, mencatat notulensi rapat secara otomatis, ngobrol santai, dan menjalankan perintah suara ala Jarvis.
+A lightweight Windows desktop companion built with Electron. Spooky sits on your desktop as an animated ghost widget and expands into a daily planner, meeting notetaker, and voice-triggered assistant.
 
-## ✨ Fitur Utama
+## Features
 
-1. **Karakter Mini Ghost Dinamis & Interaktif**
-   - Melayang ringan di desktop dengan animasi ujung kain tertiup angin, mata mengikuti kursor, berkedip natural, dan memakai headset menyala saat merekam rapat.
-   - Panel dashboard muncul menyatu dari karakter hantu, dengan selebrasi putaran 3D volumetrik saat tugas diselesaikan.
-2. **Smart Daily Task & Schedule Manager (CRUD Lengkap)**
-   - Cincin progres harian, strip 7 hari + pemilih tanggal bebas (`Pilih 📅`), hitung mundur deadline hidup, dan pengingat otomatis menjelang batas waktu.
-   - Tambah tugas pakai bahasa natural (*"Kumpul laporan 30 Nov jam 2 siang"*) atau form manual (`📅`), klik kartu untuk edit, centang untuk selebrasi, atau hapus.
-3. **Live Meeting Notetaker & AI MoM (Online / Offline)**
-   - Mendukung rekaman **Mikrofon (Offline)** maupun **Sistem + Mic (Zoom/Meet/Discord)** dengan *live audio waveform*.
-   - Menghasilkan transkrip, ringkasan, poin utama, saran strategis AI, dan **Action Items** dengan tombol 1-klik `+ Jadwal`.
-   - Otomatis tersimpan sebagai file Markdown di folder `notulensi/` lengkap dengan tombol **Buka File** & **Buka Folder**.
-4. **Tab Tanya Multi-Provider AI & Memori Percakapan**
-   - Mendukung **Gemini**, **Groq (Llama 3.3 70B)**, dan **OpenRouter** yang bisa diganti lewat Tab Pengaturan (`⚙️`).
-   - Memori percakapan multi-turn + akurat membaca jadwal asli tanpa mengarang.
-5. **Jarvis Hands-Free (`"Hey Spooky"`) & Sistem Suara**
-   - Deteksi panggilan lokal di Windows (`System.Speech`, 0% kuota internet saat standby) untuk membuka aplikasi/website, memulai/menghentikan notulensi rapat, atau menambah tugas.
-   - Dilengkapi efek suara Web Audio dan suara bicara (TTS) yang bisa diatur di Pengaturan.
+- **Desktop Widget & Panel**
+  - Transparent, always-on-top floating ghost with eye tracking, idle animation, and a 3D spin celebration when you check off a task.
+  - Click the ghost to expand the planner drawer; drag it anywhere on screen.
+  - Optional Windows auto-start on login (no terminal window).
 
-## 🚀 Cara Menjalankan
+- **Daily Task & Schedule Manager**
+  - Full CRUD for tasks with priority levels, live deadline countdowns, and a 7-day strip plus custom date picker.
+  - Natural-language task input (e.g. `"Submit report Nov 30 at 2 PM"`) parsed into date, time, and priority.
+  - Deadline reminders 30 minutes before due time.
+
+- **Google Calendar Sync**
+  - Pull upcoming events from Google Calendar using your private `.ics` feed URL (auto-syncs on startup or via manual refresh).
+  - One-click export of any local task to Google Calendar.
+
+- **Meeting Notetaker (MoM)**
+  - Records from your microphone (offline meetings) or mixed system audio + mic (Zoom, Google Meet, Discord) with a live waveform visualizer.
+  - Generates structured Minutes of Meeting: summary, key points, action items (1-click add to tasks), and follow-up suggestions.
+  - Automatically saves each session (including full transcript) as a `.md` file in `notulensi/`.
+
+- **Multi-Provider Chat & Hands-Free Voice Commands**
+  - Switch between **Gemini**, **Groq** (Llama 3.3 70B), and **OpenRouter** in Settings.
+  - Local Windows wake-word listener (`"Hey Spooky"` via `System.Speech`, zero API calls while idle) plus a global `Ctrl+Shift+S` hotkey.
+  - Supports opening Windows apps, launching URLs/Google searches, starting or stopping meeting recordings, and adding tasks by voice or text.
+  - Neural TTS responses synced with on-screen bubbles.
+
+## Project Structure
+
+```text
+src/
+├── main/
+│   ├── main.js              # Electron window, tray, IPC handlers, auto-start
+│   ├── aiEngine.js          # Multi-provider chat, task parsing, audio MoM & TTS
+│   ├── taskManager.js       # Local JSON task store & deadline reminder loop
+│   ├── calendarSync.js      # Zero-dependency iCal (.ics) parser & GCal links
+│   ├── jarvisController.js  # Local Windows wake-word listener & app launcher
+│   └── configManager.js     # Local config persistence
+├── preload/
+│   └── preload.js           # Context-isolated IPC bridge
+└── renderer/
+    ├── index.html
+    ├── style.css
+    └── app.js
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- Windows 10/11 (required for local `System.Speech` wake-word detection and system audio capture)
+- A [Google AI Studio](https://aistudio.google.com/) API key (used for audio meeting notes, neural TTS, and default chat)
+
+### Installation
 
 ```bash
+git clone https://github.com/nzrlfrrs/spooky_assistant.git
+cd spooky_assistant
 npm install
 npm start
 ```
 
-Buka tab **Atur (`⚙️`)** untuk mengisi API Key (Gemini / Groq / OpenRouter) dan mengatur preferensi suara atau mode Jarvis.
+### Configuration
+
+Copy `config.example.json` to `config.json` (or configure directly inside the app under the **Settings** tab):
+
+- **Gemini API Key** — required for meeting audio transcription, MoM generation, and neural TTS.
+- **Groq / OpenRouter API Key** *(optional)* — faster or alternative models for chat.
+- **Google Calendar iCal URL** *(optional)* — found in Google Calendar under *Settings → Integrate calendar → Secret address in iCal format*.
+
+Local files (`config.json`, `tasks.json`, and `notulensi/`) are gitignored and stay strictly on your machine.
+
+## License
+
+MIT
