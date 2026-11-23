@@ -1433,8 +1433,8 @@ document.querySelectorAll('#cfgProviderGroup .prio-pill').forEach((btn) => {
 async function runGCalSync(customUrl = null, silent = false) {
   const btn = $('btnSyncGcalNow');
   const heroBtn = $('btnHeroSyncGcal');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
-  if (heroBtn) heroBtn.disabled = true;
+  if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+  if (heroBtn) { heroBtn.disabled = true; heroBtn.classList.add('spinning'); }
   try {
     const res = await api.syncGoogleCalendar(customUrl);
     if (res && res.success) {
@@ -1450,8 +1450,8 @@ async function runGCalSync(customUrl = null, silent = false) {
   } catch {
     if (!silent) toast('Gagal menghubungi Google Calendar.');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync'; }
-    if (heroBtn) heroBtn.disabled = false;
+    if (btn) { btn.disabled = false; btn.classList.remove('spinning'); }
+    if (heroBtn) { heroBtn.disabled = false; heroBtn.classList.remove('spinning'); }
   }
 }
 
