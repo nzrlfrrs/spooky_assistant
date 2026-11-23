@@ -8,5 +8,6 @@
   "soundEnabled": true,
   "ttsEnabled": true,
   "jarvisHandsFree": true,
+  "autoStart": false,
   "nudgeIntervalMinutes": 15
 }
