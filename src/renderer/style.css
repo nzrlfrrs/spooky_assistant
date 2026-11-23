@@ -533,10 +533,15 @@ body.mode-expanded .floating-bubble {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding: 2px 1px 4px;
+  overflow-y: hidden;
+  padding: 4px 2px 6px;
   flex-shrink: 0;
+  scroll-behavior: smooth;
 }
-.day-strip::-webkit-scrollbar { height: 0; }
+.day-strip::-webkit-scrollbar { height: 4px; }
+.day-strip::-webkit-scrollbar-track { background: transparent; }
+.day-strip::-webkit-scrollbar-thumb { background: rgba(167, 139, 250, 0.35); border-radius: 4px; }
+.day-strip::-webkit-scrollbar-thumb:hover { background: rgba(167, 139, 250, 0.65); }
 .day-chip {
   position: relative;
   flex: 0 0 auto;

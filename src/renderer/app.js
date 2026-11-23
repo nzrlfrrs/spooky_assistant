@@ -620,6 +620,14 @@ $('customDatePicker').addEventListener('change', (e) => {
   }
 });
 
+// Scroll mouse wheel vertikal -> geser strip tanggal kiri/kanan dengan mulus
+$('dayStrip').addEventListener('wheel', (e) => {
+  if (Math.abs(e.deltaY) > 0) {
+    e.preventDefault();
+    $('dayStrip').scrollLeft += e.deltaY;
+  }
+}, { passive: false });
+
 function renderTasks() {
   const list = $('taskListContainer');
   list.innerHTML = '';
