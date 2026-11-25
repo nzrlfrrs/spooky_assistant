@@ -82,6 +82,9 @@ function showBubble(text, title = 'SPOOKY', ms = 6000) {
   clearTimeout(bubbleTimer);
   if (ms > 0) bubbleTimer = setTimeout(hideBubble, ms);
 }
+function showSpokenBubble(text, title = 'SPOOKY', ms = 6000) {
+  speakText(text, null, () => showBubble(text, title, ms));
+}
 function hideBubble() {
   floatingBubble.style.display = 'none';
   if (mode === 'compact') api.setIgnoreMouseEvents(true, { forward: true });
@@ -300,7 +303,7 @@ function playPcmAudio(base64, mimeType = 'audio/l16; rate=24000') {
 }
 
 async function speakText(text, preloadedAudio = null, onStart = null) {
-  if (!ttsEnabled || !text) {
+  if (!ttsEnabled || !text || isRecording) {
     if (onStart) onStart();
     return;
   }
@@ -679,7 +682,8 @@ function renderTasks() {
             `Keren banget! Satu tugas beres~ ✨`,
             `Wuhu! Spooky bangga sama kamu! 💜`
           ];
-          toast(cheers[Math.floor(Math.random() * cheers.length)]);
+          const cheerMsg = cheers[Math.floor(Math.random() * cheers.length)];
+          speakText(cheerMsg, null, () => toast(cheerMsg));
         }
         renderAll();
       }
@@ -1397,9 +1401,12 @@ async function sendChat(textOverride) {
   const typing = addChatMsg(null, 'bot');
   const res = await api.askAI(text, chatMemory.slice(-16));
   const reply = await executeJarvisIntent(res, false);
-  typing.textContent = reply;
-  chatMemory.push({ role: 'model', text: reply });
-  chatHistory.scrollTop = chatHistory.scrollHeight;
+  const preloaded = typeof res === 'object' ? res.ttsAudio : null;
+  await speakText(reply, preloaded, () => {
+    typing.textContent = reply;
+    chatMemory.push({ role: 'model', text: reply });
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+  });
 }
 $('btnSendChat').addEventListener('click', () => sendChat());
 $('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
@@ -1534,4 +1541,4 @@ window.spooky = {
 // ---------- Init ----------
 setMode('compact');
 loadTasks();
-setTimeout(() => showBubble('Halo! Aku Spooky 👻 Klik aku untuk buka panel.', 'SPOOKY', 5000), 600);
+setTimeout(() => showSpokenBubble('Halo! Aku Spooky 👻 Klik aku untuk buka panel.', 'SPOOKY', 6000), 600);
