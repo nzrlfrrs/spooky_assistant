@@ -249,24 +249,34 @@ function buildTaskSummary() {
   return taskSummary;
 }
 
+async function attachTtsAudio(res) {
+  const cfg = ConfigManager.getConfig();
+  if (res && res.reply && cfg.ttsEnabled !== false) {
+    try {
+      res.ttsAudio = await AIEngine.synthesizeCuteVoice(res.reply);
+    } catch {}
+  }
+  return res;
+}
+
 ipcMain.handle('ai-ask', async (event, payload) => {
   const query = typeof payload === 'string' ? payload : payload?.query || '';
   const history = typeof payload === 'object' && Array.isArray(payload?.history) ? payload.history : [];
 
-  // Cek apakah pesan berupa perintah Jarvis cepat (buka app/web/rekam/tugas)
   const cmd = AIEngine.detectQuickCommand(query);
   if (cmd) {
+    let result = { ...cmd };
     if (cmd.intent === 'open_app' || cmd.intent === 'open_url') {
       const execRes = JarvisController.executeSystemAction(cmd.intent, cmd.target);
       if (!execRes.ok && execRes.reason) {
-        return { reply: execRes.reason, intent: 'chat', target: '' };
+        result = { reply: execRes.reason, intent: 'chat', target: '' };
       }
     }
-    return cmd;
+    return await attachTtsAudio(result);
   }
 
   const text = await AIEngine.askAI(query, history, buildTaskSummary());
-  return { reply: text, intent: 'chat', target: '' };
+  return await attachTtsAudio({ reply: text, intent: 'chat', target: '' });
 });
 
 ipcMain.handle('jarvis-process-audio', async (event, { audioBase64, mimeType }) => {
@@ -277,14 +287,7 @@ ipcMain.handle('jarvis-process-audio', async (event, { audioBase64, mimeType }) 
       res.reply = execRes.reason;
     }
   }
-  // Siapkan audio TTS di backend sebelum kirim balasan agar teks & suara muncul bersamaan (0ms delay)
-  const cfg = ConfigManager.getConfig();
-  if (res && res.reply && cfg.ttsEnabled !== false) {
-    try {
-      res.ttsAudio = await AIEngine.synthesizeCuteVoice(res.reply);
-    } catch {}
-  }
-  return res;
+  return await attachTtsAudio(res);
 });
 
 ipcMain.on('jarvis-set-paused', (event, paused) => {
