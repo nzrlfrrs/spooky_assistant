@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, nativeImage, Tray, Menu, shell, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, nativeImage, Tray, Menu, shell, globalShortcut, desktopCapturer } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const TaskManager = require('./taskManager');
@@ -197,16 +197,58 @@ ipcMain.handle('meeting-analyze-audio', async (event, { audioBase64, mimeType })
   return await AIEngine.analyzeMeetingAudio(audioBase64, mimeType);
 });
 
-ipcMain.handle('meeting-save-file', (event, { markdown, filename }) => {
+ipcMain.handle('meeting-save-file', (event, { markdown, filename, folder = 'notulensi' }) => {
   try {
-    const dir = path.join(__dirname, '../../notulensi');
+    const safeFolder = folder === 'catatan_kelas' ? 'catatan_kelas' : 'notulensi';
+    const dir = path.join(__dirname, '../../', safeFolder);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const safeName = (filename || `Notulensi_${Date.now()}.md`).replace(/[<>:"/\\|?*]/g, '_');
+    const safeName = (filename || `Catatan_${Date.now()}.md`).replace(/[<>:"/\\|?*]/g, '_');
     const fullPath = path.join(dir, safeName);
     fs.writeFileSync(fullPath, markdown, 'utf8');
     return { success: true, filePath: fullPath, fileName: safeName };
   } catch (err) {
     return { success: false, error: err.message };
+  }
+});
+
+async function capturePrimaryScreenJpeg() {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width: 1280, height: 720 }
+  });
+  if (!sources || !sources.length) return null;
+  const jpegBuf = sources[0].thumbnail.toJPEG(72);
+  return jpegBuf.toString('base64');
+}
+
+ipcMain.handle('capture-screen-slide', async () => {
+  try {
+    const data = await capturePrimaryScreenJpeg();
+    if (!data) return { success: false, error: 'Gagal menangkap layar.' };
+    const now = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return {
+      success: true,
+      data,
+      time: `${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('class-analyze-session', async (event, payload) => {
+  return await AIEngine.analyzeClassSession(payload || {});
+});
+
+ipcMain.handle('class-explain-now', async (event, contextText = '') => {
+  try {
+    const shot = await capturePrimaryScreenJpeg();
+    if (!shot) return { reply: 'Gagal menangkap layar kelas saat ini 👻' };
+    const reply = await AIEngine.explainScreenNow(shot, contextText);
+    return await attachTtsAudio({ reply });
+  } catch (err) {
+    return { reply: `Gagal menjelaskan layar: ${err.message}` };
   }
 });
 

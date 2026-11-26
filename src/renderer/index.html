@@ -122,7 +122,7 @@
       <nav class="dash-nav-tabs" id="dashNav">
         <span class="tab-indicator" id="tabIndicator"></span>
         <button class="nav-tab active" data-tab="tabTasks"><span class="tab-icon">📜</span><span>Tugas</span></button>
-        <button class="nav-tab" data-tab="tabMeeting"><span class="tab-icon">🎙️</span><span>Rapat</span></button>
+        <button class="nav-tab" data-tab="tabMeeting"><span class="tab-icon">🎙️</span><span>Sesi</span></button>
         <button class="nav-tab" data-tab="tabChat"><span class="tab-icon">💬</span><span>Tanya</span></button>
         <button class="nav-tab" data-tab="tabSettings"><span class="tab-icon">⚙️</span><span>Atur</span></button>
       </nav>
@@ -167,6 +167,11 @@
 
         <!-- ========== TAB: NOTULENSI MEETING ========== -->
         <div class="tab-pane" id="tabMeeting">
+          <div class="session-mode-row" id="sessionModeRow">
+            <button type="button" class="source-pill active" data-mode="meeting">🎙️ Mode Rapat (MoM)</button>
+            <button type="button" class="source-pill" data-mode="class">🎓 Mode Kelas Online</button>
+          </div>
+
           <div class="meeting-control-card">
             <div class="meeting-status-row">
               <div class="meeting-live-badge" id="meetingBadge">
@@ -187,13 +192,28 @@
                 <span class="rec-icon" id="btnRecIcon">🎙️</span>
                 <span id="btnRecLabel">Mulai Rekam Meeting</span>
               </button>
-              <button class="btn-secondary" id="btnGenerateMoM"><span>⚡</span> Buat Notulensi</button>
+              <button class="btn-secondary" id="btnGenerateMoM"><span>⚡</span> <span id="btnGenLabel">Buat Notulensi</span></button>
             </div>
+
+            <div class="class-tools-row" id="classToolsRow" style="display: none;">
+              <button type="button" class="btn-secondary class-tool-btn" id="btnCaptureSlide">📸 Tangkap Slide/Kode</button>
+              <button type="button" class="btn-secondary class-tool-btn" id="btnExplainNow">❓ Jelasin Barusan</button>
+            </div>
+
+            <div class="slide-thumbs-strip" id="slideThumbsStrip" style="display: none;"></div>
+          </div>
+
+          <div class="explain-box" id="explainBox" style="display: none;">
+            <div class="explain-header">
+              <span class="mom-title">💡 PENJELASAN SPOOKY</span>
+              <button class="btn-link" id="btnCloseExplain">Tutup</button>
+            </div>
+            <div class="mom-text" id="explainText"></div>
           </div>
 
           <div class="transcript-section">
             <div class="section-label-row">
-              <span>Transkrip rapat (otomatis dari audio / tempel teks)</span>
+              <span id="transcriptSectionLabel">Transkrip rapat (otomatis dari audio / tempel teks)</span>
               <button class="btn-link" id="btnClearTranscript">Bersihkan</button>
             </div>
             <textarea id="transcriptInput" class="glass-textarea" placeholder="Rekam suara meeting lalu klik Stop untuk transkrip & notulensi otomatis, atau tempel teks rapatmu di sini..."></textarea>
@@ -201,7 +221,7 @@
 
           <div class="mom-output-card" id="momOutputCard" style="display: none;">
             <div class="mom-header">
-              <div class="mom-title">📋 HASIL NOTULENSI (MoM)</div>
+              <div class="mom-title" id="momOutputTitle">📋 HASIL NOTULENSI (MoM)</div>
               <div class="mom-header-btns">
                 <button class="btn-chip" id="btnCopyMoM">📋 Salin</button>
               </div>
@@ -213,10 +233,12 @@
                 <button class="btn-chip" id="btnOpenMoMFolder">📁 Folder</button>
               </div>
             </div>
-            <div class="mom-block"><div class="mom-subheading">📌 Ringkasan</div><div class="mom-text" id="momSummary"></div></div>
-            <div class="mom-block"><div class="mom-subheading">💡 Poin utama</div><ul class="mom-list" id="momKeyPoints"></ul></div>
-            <div class="mom-block"><div class="mom-subheading">✅ Action items</div><div class="action-items-list" id="momActionItems"></div></div>
-            <div class="mom-block"><div class="mom-subheading">🔮 Saran & tindak lanjut AI</div><ul class="mom-list suggestions" id="momSuggestions"></ul></div>
+            <div class="mom-block"><div class="mom-subheading" id="momSumHeading">📌 Ringkasan</div><div class="mom-text" id="momSummary"></div></div>
+            <div class="mom-block"><div class="mom-subheading" id="momKpHeading">💡 Poin utama</div><ul class="mom-list" id="momKeyPoints"></ul></div>
+            <div class="mom-block" id="momCodeBlock" style="display: none;"><div class="mom-subheading">💻 Penjelasan Kode & Slide Layar</div><ul class="mom-list" id="momCodeList"></ul></div>
+            <div class="mom-block"><div class="mom-subheading" id="momAiHeading">✅ Action items</div><div class="action-items-list" id="momActionItems"></div></div>
+            <div class="mom-block" id="momSugBlock"><div class="mom-subheading">🔮 Saran & tindak lanjut AI</div><ul class="mom-list suggestions" id="momSuggestions"></ul></div>
+            <div class="mom-block" id="momQuizBlock" style="display: none;"><div class="mom-subheading">📝 Latihan Quiz Review (klik untuk lihat jawaban)</div><div class="quiz-list" id="momQuizList"></div></div>
           </div>
         </div>
 

@@ -864,7 +864,10 @@ api.onTaskReminder((r) => {
 // ========================================================
 // NOTULENSI MEETING AI (Audio Capture, Live Wave & MoM)
 // ========================================================
-let audioSourceMode = 'mic'; // 'mic' | 'both'
+let sessionMode = 'meeting';
+let audioSourceMode = 'mic';
+let capturedSlides = [];
+let lastSessionIsClass = false;
 let isRecording = false;
 let mediaRecorder = null;
 let audioChunks = [];
@@ -937,14 +940,122 @@ function blobToBase64(blob) {
   });
 }
 
+function setAudioSourceMode(src) {
+  audioSourceMode = src === 'both' ? 'both' : 'mic';
+  document.querySelectorAll('#audioSourceRow .source-pill').forEach((b) =>
+    b.classList.toggle('active', b.dataset.source === audioSourceMode)
+  );
+}
+
+function renderSlideThumbs() {
+  const strip = $('slideThumbsStrip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  if (sessionMode !== 'class' || !capturedSlides.length) {
+    strip.style.display = 'none';
+    return;
+  }
+  strip.style.display = 'flex';
+  capturedSlides.forEach((slide, idx) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'slide-thumb';
+    const img = document.createElement('img');
+    img.src = `data:image/jpeg;base64,${slide.data}`;
+    img.alt = `Slide ${idx + 1}`;
+    const timeEl = document.createElement('span');
+    timeEl.className = 'slide-thumb-time';
+    timeEl.textContent = slide.time || '';
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'slide-thumb-del';
+    delBtn.textContent = '×';
+    delBtn.addEventListener('click', () => {
+      capturedSlides.splice(idx, 1);
+      renderSlideThumbs();
+    });
+    wrap.append(img, timeEl, delBtn);
+    strip.appendChild(wrap);
+  });
+}
+
+function applySessionMode(modeName) {
+  sessionMode = modeName === 'class' ? 'class' : 'meeting';
+  const isClass = sessionMode === 'class';
+  document.querySelectorAll('#sessionModeRow .source-pill').forEach((b) =>
+    b.classList.toggle('active', b.dataset.mode === sessionMode)
+  );
+  $('classToolsRow').style.display = isClass ? 'flex' : 'none';
+  if (isClass && !isRecording) setAudioSourceMode('both');
+  if (!isRecording) {
+    $('btnRecLabel').textContent = isClass ? 'Mulai Rekam Kelas' : 'Mulai Rekam Meeting';
+  }
+  $('btnGenLabel').textContent = isClass ? 'Buat Catatan Kelas' : 'Buat Notulensi';
+  $('transcriptSectionLabel').textContent = isClass
+    ? 'Transkrip / catatan kuliah (otomatis dari audio / tempel teks)'
+    : 'Transkrip rapat (otomatis dari audio / tempel teks)';
+  $('transcriptInput').placeholder = isClass
+    ? 'Rekam suara dosen & tangkap slide/kode, lalu klik Stop untuk Catatan Kuliah + Quiz otomatis...'
+    : 'Rekam suara meeting lalu klik Stop untuk transkrip & notulensi otomatis, atau tempel teks rapatmu di sini...';
+  renderSlideThumbs();
+}
+
+document.querySelectorAll('#sessionModeRow .source-pill').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (isRecording) return;
+    applySessionMode(btn.dataset.mode);
+  });
+});
+
 document.querySelectorAll('#audioSourceRow .source-pill').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (isRecording) return;
-    audioSourceMode = btn.dataset.source;
-    document.querySelectorAll('#audioSourceRow .source-pill').forEach((b) =>
-      b.classList.toggle('active', b === btn)
-    );
+    setAudioSourceMode(btn.dataset.source);
   });
+});
+
+$('btnCaptureSlide').addEventListener('click', async () => {
+  const btn = $('btnCaptureSlide');
+  btn.disabled = true;
+  try {
+    const res = await api.captureScreenSlide();
+    if (res && res.success && res.data) {
+      capturedSlides.push({ data: res.data, time: res.time });
+      if (capturedSlides.length > 6) capturedSlides = capturedSlides.slice(-6);
+      renderSlideThumbs();
+      playPopSound();
+      toast(`📸 Slide/kode ditangkap (${capturedSlides.length}/6)`);
+    } else {
+      toast(res?.error || 'Gagal menangkap layar.');
+    }
+  } catch {
+    toast('Gagal menangkap layar kelas.');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('btnExplainNow').addEventListener('click', async () => {
+  const btn = $('btnExplainNow');
+  btn.disabled = true;
+  btn.textContent = '⏳ Membaca layar...';
+  try {
+    const ctxText = $('transcriptInput').value.trim();
+    const res = await api.explainClassNow(ctxText);
+    const reply = res?.reply || 'Gagal menjelaskan layar saat ini.';
+    $('explainText').textContent = reply;
+    $('explainBox').style.display = 'flex';
+    $('explainBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    await speakText(reply, res?.ttsAudio || null);
+  } catch {
+    toast('Gagal menganalisis layar kelas.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '❓ Jelasin Barusan';
+  }
+});
+
+$('btnCloseExplain').addEventListener('click', () => {
+  $('explainBox').style.display = 'none';
 });
 
 async function startMeetingRecording() {
@@ -1009,7 +1120,7 @@ async function startMeetingRecording() {
     $('meetingStatusLabel').textContent = audioSourceMode === 'both' ? 'Merekam Sistem + Mic...' : 'Merekam Mikrofon...';
     $('btnToggleRecord').classList.add('recording');
     $('btnRecIcon').textContent = '⏹️';
-    $('btnRecLabel').textContent = 'Stop & Buat Notulensi';
+    $('btnRecLabel').textContent = sessionMode === 'class' ? 'Stop & Buat Catatan' : 'Stop & Buat Notulensi';
     $('btnGenerateMoM').disabled = true;
     window.spooky.setMeetingMode(true);
 
@@ -1047,29 +1158,43 @@ function cleanupRecordingResources() {
   $('meetingBadge').classList.remove('recording');
   $('btnToggleRecord').classList.remove('recording');
   $('btnRecIcon').textContent = '🎙️';
-  $('btnRecLabel').textContent = 'Mulai Rekam Meeting';
+  $('btnRecLabel').textContent = sessionMode === 'class' ? 'Mulai Rekam Kelas' : 'Mulai Rekam Meeting';
   window.spooky.setMeetingMode(false);
   drawIdleWave();
 }
 
 async function processRecordedAudio(blob, mimeType) {
-  $('meetingStatusLabel').textContent = 'AI sedang menyusun notulensi...';
+  const isClass = sessionMode === 'class';
+  $('meetingStatusLabel').textContent = isClass
+    ? 'AI sedang menyusun catatan kelas...'
+    : 'AI sedang menyusun notulensi...';
   $('btnGenerateMoM').disabled = true;
   $('btnToggleRecord').disabled = true;
-  toast('🎧 Spooky sedang mendengarkan rekaman & membuat MoM...');
+  toast(
+    isClass
+      ? '🎓 Spooky sedang merangkum suara dosen & slide layar...'
+      : '🎧 Spooky sedang mendengarkan rekaman & membuat MoM...'
+  );
   try {
     const base64 = await blobToBase64(blob);
-    const result = await api.analyzeMeetingAudio(base64, mimeType);
+    const result = isClass
+      ? await api.analyzeClassSession({
+          audioBase64: base64,
+          mimeType,
+          transcript: $('transcriptInput').value.trim(),
+          slides: capturedSlides
+        })
+      : await api.analyzeMeetingAudio(base64, mimeType);
     if (result.transcript) {
       const existing = $('transcriptInput').value.trim();
       $('transcriptInput').value = existing
         ? `${existing}\n\n${result.transcript}`
         : result.transcript;
     }
-    renderMoM(result);
+    renderSessionOutput(result, isClass);
     if (!result.error) {
       ghostHappy();
-      toast('✨ Notulensi rapat berhasil dibuat!');
+      toast(isClass ? '🎓 Catatan kuliah & quiz berhasil dibuat!' : '✨ Notulensi rapat berhasil dibuat!');
     } else {
       toast(result.summary || 'Gagal menganalisis audio.');
     }
@@ -1083,55 +1208,98 @@ async function processRecordedAudio(blob, mimeType) {
 }
 
 async function generateMoMFromText() {
+  const isClass = sessionMode === 'class';
   const transcript = $('transcriptInput').value.trim();
-  if (!transcript) {
-    toast('Rekam suara atau tempel teks transkrip rapat dulu ya.');
+  if (!transcript && !(isClass && capturedSlides.length)) {
+    toast(
+      isClass
+        ? 'Rekam suara dosen, tangkap slide/kode, atau tempel catatan dulu ya.'
+        : 'Rekam suara atau tempel teks transkrip rapat dulu ya.'
+    );
     $('transcriptInput').focus();
     return;
   }
   const btn = $('btnGenerateMoM');
   btn.disabled = true;
-  btn.textContent = '⏳ Menyusun...';
+  $('btnGenLabel').textContent = 'Menyusun...';
   try {
-    const result = await api.generateMeetingMoM(transcript);
-    renderMoM(result);
-    ghostHappy();
-    toast('✨ Notulensi MoM siap dilihat!');
+    const result = isClass
+      ? await api.analyzeClassSession({ transcript, slides: capturedSlides })
+      : await api.generateMeetingMoM(transcript);
+    renderSessionOutput(result, isClass);
+    if (!result.error) {
+      ghostHappy();
+      toast(isClass ? '🎓 Catatan kuliah siap dibaca!' : '✨ Notulensi MoM siap dilihat!');
+    } else {
+      toast(result.summary || 'Gagal memproses sesi.');
+    }
   } catch (err) {
-    toast('Gagal membuat notulensi, coba lagi ya.');
+    toast(isClass ? 'Gagal membuat catatan kelas, coba lagi ya.' : 'Gagal membuat notulensi, coba lagi ya.');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<span>⚡</span> Buat Notulensi';
+    $('btnGenLabel').textContent = sessionMode === 'class' ? 'Buat Catatan Kelas' : 'Buat Notulensi';
   }
 }
 
-function renderMoM(mom) {
-  lastMoM = mom;
+function renderSessionOutput(data, isClass = false) {
+  lastMoM = data;
+  lastSessionIsClass = isClass;
   $('momOutputCard').style.display = 'flex';
-  $('momSummary').textContent = mom.summary || '-';
+
+  $('momOutputTitle').textContent = isClass
+    ? `🎓 CATATAN KELAS${data.title ? `: ${data.title}` : ''}`
+    : '📋 HASIL NOTULENSI (MoM)';
+  $('momSumHeading').textContent = isClass ? '📌 Ringkasan Materi' : '📌 Ringkasan';
+  $('momKpHeading').textContent = isClass ? '🧠 Konsep & Istilah Penting' : '💡 Poin utama';
+  $('momAiHeading').textContent = isClass ? '✅ PR & Tugas Kuliah' : '✅ Action items';
+
+  $('momCodeBlock').style.display = isClass ? 'flex' : 'none';
+  $('momQuizBlock').style.display = isClass ? 'flex' : 'none';
+  $('momSugBlock').style.display = isClass ? 'none' : 'flex';
+
+  $('momSummary').textContent = data.summary || '-';
 
   const kpList = $('momKeyPoints');
   kpList.innerHTML = '';
-  (mom.keyPoints || []).forEach((pt) => {
+  const kpSource = isClass ? (data.concepts || []) : (data.keyPoints || []);
+  kpSource.forEach((pt) => {
     const li = document.createElement('li');
     li.textContent = pt;
     kpList.appendChild(li);
   });
-  if (!kpList.children.length) kpList.innerHTML = '<li>Tidak ada poin utama tercatat.</li>';
+  if (!kpList.children.length) {
+    kpList.innerHTML = isClass
+      ? '<li>Tidak ada konsep utama tercatat.</li>'
+      : '<li>Tidak ada poin utama tercatat.</li>';
+  }
+
+  if (isClass) {
+    const codeList = $('momCodeList');
+    codeList.innerHTML = '';
+    (data.codeAndSlides || []).forEach((item) => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      codeList.appendChild(li);
+    });
+    if (!codeList.children.length) {
+      codeList.innerHTML = '<li>Belum ada slide atau kode yang tertangkap.</li>';
+    }
+  }
 
   const aiList = $('momActionItems');
   aiList.innerHTML = '';
-  (mom.actionItems || []).forEach((item) => {
+  const aiSource = isClass ? (data.assignments || []) : (data.actionItems || []);
+  aiSource.forEach((item) => {
     const row = document.createElement('div');
     row.className = 'action-item-row';
     const taskText = typeof item === 'string' ? item : item.task;
-    const assignee = typeof item === 'object' && item.assignee ? item.assignee : 'Umum';
+    const assignee = typeof item === 'object' && item.assignee ? item.assignee : (isClass ? 'Tugas Kuliah' : 'Umum');
     const deadline = typeof item === 'object' && item.deadline ? item.deadline : '';
 
     row.innerHTML =
       `<div class="action-item-title">` +
         `<div class="ai-task-name"></div>` +
-        `<div class="action-item-meta">👤 ${assignee}${deadline ? ` • ⏰ ${deadline}` : ''}</div>` +
+        `<div class="action-item-meta">${isClass ? '📚' : '👤'} ${assignee}${deadline ? ` • ⏰ ${deadline}` : ''}</div>` +
       `</div>` +
       `<button type="button" class="btn-add-action">+ Jadwal</button>`;
     row.querySelector('.ai-task-name').textContent = taskText;
@@ -1161,67 +1329,120 @@ function renderMoM(mom) {
     aiList.appendChild(row);
   });
   if (!aiList.children.length) {
-    aiList.innerHTML = '<div class="mom-text">Tidak ada action item spesifik.</div>';
+    aiList.innerHTML = isClass
+      ? '<div class="mom-text">Tidak ada PR atau tugas kuliah yang disebutkan.</div>'
+      : '<div class="mom-text">Tidak ada action item spesifik.</div>';
   }
 
-  const sugList = $('momSuggestions');
-  sugList.innerHTML = '';
-  (mom.aiSuggestions || []).forEach((s) => {
-    const li = document.createElement('li');
-    li.textContent = s;
-    sugList.appendChild(li);
-  });
-  if (!sugList.children.length) sugList.innerHTML = '<li>Belum ada saran tambahan.</li>';
+  if (isClass) {
+    const quizList = $('momQuizList');
+    quizList.innerHTML = '';
+    (data.quiz || []).forEach((q, idx) => {
+      const card = document.createElement('div');
+      card.className = 'quiz-card';
+      const qEl = document.createElement('div');
+      qEl.className = 'quiz-q';
+      qEl.textContent = `${idx + 1}. ${q.question || ''}`;
+      const aEl = document.createElement('div');
+      aEl.className = 'quiz-a';
+      aEl.textContent = `Jawaban: ${q.answer || '-'}`;
+      card.append(qEl, aEl);
+      card.addEventListener('click', () => card.classList.toggle('revealed'));
+      quizList.appendChild(card);
+    });
+    if (!quizList.children.length) {
+      quizList.innerHTML = '<div class="mom-text">Belum ada latihan quiz untuk sesi ini.</div>';
+    }
+  } else {
+    const sugList = $('momSuggestions');
+    sugList.innerHTML = '';
+    (data.aiSuggestions || []).forEach((s) => {
+      const li = document.createElement('li');
+      li.textContent = s;
+      sugList.appendChild(li);
+    });
+    if (!sugList.children.length) sugList.innerHTML = '<li>Belum ada saran tambahan.</li>';
+  }
 
-  autoSaveMoMFile(mom);
+  autoSaveMoMFile(data, isClass);
   $('momOutputCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 let lastMoMFilePath = null;
 
-function buildMoMMarkdown(mom, transcriptText = '') {
+function buildMoMMarkdown(data, transcriptText = '', isClass = false) {
   const now = new Date();
   const stamp = now.toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
-  const lines = [
-    '# Notulensi Meeting (Spooky AI)',
-    `> Dicatat pada: ${stamp}`,
-    '',
-    '## Ringkasan',
-    mom.summary || '-',
-    '',
-    '## Poin Utama',
-    ...((mom.keyPoints || []).length ? mom.keyPoints.map((p) => `- ${p}`) : ['- (Tidak ada poin utama)']),
-    '',
-    '## Action Items',
-    ...((mom.actionItems || []).length
-      ? mom.actionItems.map((a) =>
-          typeof a === 'string'
-            ? `- [ ] ${a}`
-            : `- [ ] ${a.task} (PIC: ${a.assignee || 'Umum'}${a.deadline ? `, Deadline: ${a.deadline}` : ''})`
-        )
-      : ['- (Tidak ada action item)']),
-    '',
-    '## Saran & Tindak Lanjut AI',
-    ...((mom.aiSuggestions || []).length ? mom.aiSuggestions.map((s) => `- ${s}`) : ['- (Belum ada saran)'])
-  ];
-  const fullTranscript = (mom.transcript || transcriptText || '').trim();
+  const lines = isClass
+    ? [
+        `# Catatan Kelas: ${data.title || 'Sesi Kuliah'} (Spooky AI)`,
+        `> Dicatat pada: ${stamp}`,
+        '',
+        '## Ringkasan Materi',
+        data.summary || '-',
+        '',
+        '## Konsep & Istilah Penting',
+        ...((data.concepts || []).length ? data.concepts.map((c) => `- ${c}`) : ['- (Tidak ada konsep tercatat)']),
+        '',
+        '## Penjelasan Kode & Slide Layar',
+        ...((data.codeAndSlides || []).length ? data.codeAndSlides.map((c) => `- ${c}`) : ['- (Tidak ada slide/kode tertangkap)']),
+        '',
+        '## PR & Tugas Kuliah',
+        ...((data.assignments || []).length
+          ? data.assignments.map((a) =>
+              typeof a === 'string'
+                ? `- [ ] ${a}`
+                : `- [ ] ${a.task}${a.deadline ? ` (Deadline: ${a.deadline})` : ''}`
+            )
+          : ['- (Tidak ada PR/tugas)']),
+        '',
+        '## Latihan Quiz Review',
+        ...((data.quiz || []).length
+          ? data.quiz.map((q, i) => `${i + 1}. **${q.question}**\n   - Jawaban: ${q.answer}`)
+          : ['- (Belum ada quiz)'])
+      ]
+    : [
+        '# Notulensi Meeting (Spooky AI)',
+        `> Dicatat pada: ${stamp}`,
+        '',
+        '## Ringkasan',
+        data.summary || '-',
+        '',
+        '## Poin Utama',
+        ...((data.keyPoints || []).length ? data.keyPoints.map((p) => `- ${p}`) : ['- (Tidak ada poin utama)']),
+        '',
+        '## Action Items',
+        ...((data.actionItems || []).length
+          ? data.actionItems.map((a) =>
+              typeof a === 'string'
+                ? `- [ ] ${a}`
+                : `- [ ] ${a.task} (PIC: ${a.assignee || 'Umum'}${a.deadline ? `, Deadline: ${a.deadline}` : ''})`
+            )
+          : ['- (Tidak ada action item)']),
+        '',
+        '## Saran & Tindak Lanjut AI',
+        ...((data.aiSuggestions || []).length ? data.aiSuggestions.map((s) => `- ${s}`) : ['- (Belum ada saran)'])
+      ];
+  const fullTranscript = (data.transcript || transcriptText || '').trim();
   if (fullTranscript) {
     lines.push('', '---', '', '## Transkrip Lengkap', fullTranscript);
   }
   return lines.join('\n');
 }
 
-async function autoSaveMoMFile(mom) {
-  if (!mom || mom.error) {
+async function autoSaveMoMFile(data, isClass = false) {
+  if (!data || data.error) {
     $('momFileBar').style.display = 'none';
     lastMoMFilePath = null;
     return;
   }
   const now = new Date();
   const p = (n) => String(n).padStart(2, '0');
-  const fileName = `Notulensi_${ymd(now)}_${p(now.getHours())}-${p(now.getMinutes())}.md`;
-  const md = buildMoMMarkdown(mom, $('transcriptInput').value.trim());
-  const saved = await api.saveMeetingFile(md, fileName);
+  const prefix = isClass ? 'Kelas' : 'Notulensi';
+  const folder = isClass ? 'catatan_kelas' : 'notulensi';
+  const fileName = `${prefix}_${ymd(now)}_${p(now.getHours())}-${p(now.getMinutes())}.md`;
+  const md = buildMoMMarkdown(data, $('transcriptInput').value.trim(), isClass);
+  const saved = await api.saveMeetingFile(md, fileName, folder);
   if (saved && saved.success) {
     lastMoMFilePath = saved.filePath;
     $('momFileName').textContent = `📄 ${saved.fileName}`;
@@ -1238,8 +1459,12 @@ $('btnClearTranscript').addEventListener('click', () => {
   $('transcriptInput').value = '';
   $('momOutputCard').style.display = 'none';
   $('momFileBar').style.display = 'none';
+  $('explainBox').style.display = 'none';
   $('meetingTimer').textContent = '00:00';
+  capturedSlides = [];
+  renderSlideThumbs();
   lastMoM = null;
+  lastSessionIsClass = false;
   lastMoMFilePath = null;
 });
 $('btnOpenMoMFile').addEventListener('click', () => {
@@ -1251,8 +1476,10 @@ $('btnOpenMoMFolder').addEventListener('click', () => {
 $('btnCopyMoM').addEventListener('click', async () => {
   if (!lastMoM) return;
   try {
-    await navigator.clipboard.writeText(buildMoMMarkdown(lastMoM, $('transcriptInput').value.trim()));
-    toast('📋 Notulensi disalin dalam format Markdown!');
+    await navigator.clipboard.writeText(
+      buildMoMMarkdown(lastMoM, $('transcriptInput').value.trim(), lastSessionIsClass)
+    );
+    toast(lastSessionIsClass ? '📋 Catatan kelas disalin (Markdown)!' : '📋 Notulensi disalin dalam format Markdown!');
   } catch {
     toast('Gagal menyalin ke clipboard.');
   }
