@@ -63,20 +63,24 @@ function parseICS(icsText) {
 
   const events = [];
   let inEvent = false;
+  let inAlarm = false;
   let current = {};
 
   const now = new Date();
-  const minDate = now; // Hanya tarik event yang akan datang agar acara lalu tidak dianggap tugas telat
+  const minDate = now;
   const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60);
 
   for (const line of lines) {
-    if (line === 'BEGIN:VEVENT') {
+    const upper = line.trim().toUpperCase();
+    if (upper === 'BEGIN:VEVENT') {
       inEvent = true;
+      inAlarm = false;
       current = {};
       continue;
     }
-    if (line === 'END:VEVENT') {
+    if (upper === 'END:VEVENT') {
       inEvent = false;
+      inAlarm = false;
       if (current.title && current.date) {
         const dObj = new Date(`${current.date}T${current.time || '09:00'}:00`);
         if (!isNaN(dObj.getTime()) && dObj >= minDate && dObj <= maxDate) {
@@ -94,6 +98,15 @@ function parseICS(icsText) {
       continue;
     }
     if (!inEvent) continue;
+    if (upper === 'BEGIN:VALARM') {
+      inAlarm = true;
+      continue;
+    }
+    if (upper === 'END:VALARM') {
+      inAlarm = false;
+      continue;
+    }
+    if (inAlarm) continue;
 
     const colonIdx = line.indexOf(':');
     if (colonIdx === -1) continue;
