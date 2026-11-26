@@ -241,6 +241,10 @@ ipcMain.handle('class-analyze-session', async (event, payload) => {
   return await AIEngine.analyzeClassSession(payload || {});
 });
 
+ipcMain.handle('session-transcribe-chunk', async (event, payload) => {
+  return await AIEngine.transcribeAudioChunk(payload || {});
+});
+
 ipcMain.handle('class-explain-now', async (event, contextText = '') => {
   try {
     const shot = await capturePrimaryScreenJpeg();

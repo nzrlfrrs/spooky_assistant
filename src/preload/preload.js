@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('ghostAPI', {
     ipcRenderer.invoke('meeting-save-file', { markdown, filename, folder }),
   captureScreenSlide: () => ipcRenderer.invoke('capture-screen-slide'),
   analyzeClassSession: (payload) => ipcRenderer.invoke('class-analyze-session', payload),
+  transcribeAudioChunk: (payload) => ipcRenderer.invoke('session-transcribe-chunk', payload),
   explainClassNow: (contextText = '') => ipcRenderer.invoke('class-explain-now', contextText),
   openFilePath: (filePath) => ipcRenderer.invoke('open-file-path', filePath),
   showFileInFolder: (filePath) => ipcRenderer.invoke('show-file-in-folder', filePath),
