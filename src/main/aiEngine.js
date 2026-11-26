@@ -716,7 +716,7 @@ Hasilkan JSON dengan struktur persis berikut:
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const body = {
           contents: [{ role: 'user', parts }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.3, maxOutputTokens: 2048 }
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.3, maxOutputTokens: 4096 }
         };
         const res = await fetch(url, {
           method: 'POST',
@@ -747,6 +747,52 @@ Hasilkan JSON dengan struktur persis berikut:
       assignments: [],
       quiz: []
     };
+  }
+
+  static async transcribeAudioChunk({ audioBase64 = '', mimeType = 'audio/webm', partNumber = 1, isClass = true }) {
+    const config = ConfigManager.getConfig();
+    const apiKey = config.geminiApiKey ? config.geminiApiKey.trim() : '';
+    if (!apiKey || !audioBase64) {
+      return { success: false, text: '' };
+    }
+
+    const prompt = isClass
+      ? `Kamu sedang mencatat potongan audio Bagian ${partNumber} dari sesi kelas online panjang. ` +
+        `Tuliskan ringkasan poin materi, istilah penting, kode/rumus yang disebut, dan tugas/PR (jika ada) dari potongan audio ini dalam bahasa Indonesia yang padat dan akurat (maksimal 250 kata, format poin bullet, tanpa kata pengantar).`
+      : `Kamu sedang mencatat potongan audio Bagian ${partNumber} dari rapat panjang. ` +
+        `Tuliskan ringkasan pembahasan, keputusan, dan action item/PIC/deadline (jika ada) dari potongan audio ini dalam bahasa Indonesia yang padat dan akurat (maksimal 250 kata, format poin bullet, tanpa kata pengantar).`;
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const body = {
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: mimeType.split(';')[0] || 'audio/webm', data: audioBase64 } }
+              ]
+            }
+          ],
+          generationConfig: { maxOutputTokens: 1536, temperature: 0.25 }
+        };
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(60000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const text = AIEngine.extractText(data);
+          if (text) return { success: true, text };
+        }
+      } catch (err) {
+        console.warn(`[AIEngine] Chunk ${partNumber} failed on ${model}:`, err.message);
+      }
+    }
+    return { success: false, text: '' };
   }
 
   static async explainScreenNow(screenshotBase64, contextText = '') {

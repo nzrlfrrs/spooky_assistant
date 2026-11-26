@@ -865,12 +865,18 @@ api.onTaskReminder((r) => {
 // NOTULENSI MEETING AI (Audio Capture, Live Wave & MoM)
 // ========================================================
 const MAX_CLASS_SLIDES = 15;
+const CHUNK_DURATION_MS = 30 * 60 * 1000;
 let sessionMode = 'meeting';
 let audioSourceMode = 'mic';
 let capturedSlides = [];
 let lastSessionIsClass = false;
 let isRecording = false;
 let mediaRecorder = null;
+let recDestStream = null;
+let recMimeType = 'audio/webm';
+let recChunkTimer = null;
+let recChunkIndex = 0;
+let pendingChunkPromises = [];
 let audioChunks = [];
 let activeStreams = [];
 let recAudioCtx = null;
@@ -1064,6 +1070,76 @@ $('btnCloseExplain').addEventListener('click', () => {
   $('explainBox').style.display = 'none';
 });
 
+async function processBackgroundChunk(blob, mimeType, partNumber) {
+  if (!blob || !blob.size) return;
+  try {
+    toast(`💾 Mencatat audio Bagian ${partNumber} (30 mnt) di belakang layar...`);
+    const base64 = await blobToBase64(blob);
+    const res = await api.transcribeAudioChunk({
+      audioBase64: base64,
+      mimeType,
+      partNumber,
+      isClass: sessionMode === 'class'
+    });
+    if (res && res.success && res.text) {
+      const startMin = (partNumber - 1) * 30;
+      const endMin = partNumber * 30;
+      const block = `[Bagian ${partNumber} • ${startMin}–${endMin} mnt]\n${res.text}`;
+      const existing = $('transcriptInput').value.trim();
+      $('transcriptInput').value = existing ? `${existing}\n\n${block}` : block;
+      toast(`✅ Bagian ${partNumber} tersimpan di transkrip!`);
+    } else {
+      toast(`⚠️ Gagal mencatat Bagian ${partNumber}, rekaman tetap lanjut.`);
+    }
+  } catch {
+    toast(`⚠️ Gagal mengirim Bagian ${partNumber}, rekaman tetap lanjut.`);
+  }
+}
+
+function createChunkRecorder(stream, mimeType) {
+  const localChunks = [];
+  const rec = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 32000 });
+  rec.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) localChunks.push(e.data);
+  };
+  rec.onstop = async () => {
+    const recordedMime = rec.mimeType || mimeType || 'audio/webm';
+    const blob = localChunks.length ? new Blob(localChunks, { type: recordedMime }) : null;
+    if (rec._isRotation) {
+      if (blob) {
+        const p = processBackgroundChunk(blob, recordedMime, rec._partNumber);
+        pendingChunkPromises.push(p);
+      }
+      return;
+    }
+    const hadPriorChunks = recChunkIndex > 0;
+    const inflight = pendingChunkPromises.slice();
+    pendingChunkPromises = [];
+    cleanupRecordingResources();
+    if (inflight.length) {
+      $('meetingStatusLabel').textContent = 'Menyelesaikan potongan audio...';
+      $('btnToggleRecord').disabled = true;
+      $('btnGenerateMoM').disabled = true;
+      await Promise.allSettled(inflight);
+    }
+    if (!blob && !hadPriorChunks) return;
+    await processRecordedAudio(blob, recordedMime, hadPriorChunks);
+  };
+  return rec;
+}
+
+function rotateRecordingChunk() {
+  if (!isRecording || !mediaRecorder || mediaRecorder.state !== 'recording' || !recDestStream) return;
+  recChunkIndex += 1;
+  const oldRec = mediaRecorder;
+  oldRec._isRotation = true;
+  oldRec._partNumber = recChunkIndex;
+  const nextRec = createChunkRecorder(recDestStream, recMimeType);
+  mediaRecorder = nextRec;
+  nextRec.start(1000);
+  oldRec.stop();
+}
+
 async function startMeetingRecording() {
   try {
     activeStreams = [];
@@ -1098,23 +1174,14 @@ async function startMeetingRecording() {
       }
     }
 
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    recMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
       : 'audio/webm';
+    recDestStream = dest.stream;
+    recChunkIndex = 0;
+    pendingChunkPromises = [];
     audioChunks = [];
-    mediaRecorder = new MediaRecorder(dest.stream, { mimeType, audioBitsPerSecond: 32000 });
-
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) audioChunks.push(e.data);
-    };
-
-    mediaRecorder.onstop = async () => {
-      const recordedMime = mediaRecorder.mimeType || 'audio/webm';
-      cleanupRecordingResources();
-      if (!audioChunks.length) return;
-      const blob = new Blob(audioChunks, { type: recordedMime });
-      await processRecordedAudio(blob, recordedMime);
-    };
+    mediaRecorder = createChunkRecorder(recDestStream, recMimeType);
 
     mediaRecorder.start(1000);
     isRecording = true;
@@ -1133,6 +1200,7 @@ async function startMeetingRecording() {
     recTimerInterval = setInterval(() => {
       $('meetingTimer').textContent = formatTimer(Date.now() - recStartMs);
     }, 500);
+    recChunkTimer = setInterval(rotateRecordingChunk, CHUNK_DURATION_MS);
     drawLiveWave();
   } catch (err) {
     cleanupRecordingResources();
@@ -1143,6 +1211,8 @@ async function startMeetingRecording() {
 function stopMeetingRecording() {
   if (!isRecording || !mediaRecorder) return;
   isRecording = false;
+  clearInterval(recChunkTimer);
+  recChunkTimer = null;
   playRecSound(false);
   $('meetingStatusLabel').textContent = 'Memproses audio...';
   $('btnToggleRecord').disabled = true;
@@ -1154,6 +1224,9 @@ function cleanupRecordingResources() {
   api.jarvisSetPaused(false);
   cancelAnimationFrame(waveRaf);
   clearInterval(recTimerInterval);
+  clearInterval(recChunkTimer);
+  recChunkTimer = null;
+  recDestStream = null;
   activeStreams.forEach((st) => st.getTracks().forEach((tr) => tr.stop()));
   activeStreams = [];
   if (recAudioCtx) {
@@ -1169,7 +1242,7 @@ function cleanupRecordingResources() {
   drawIdleWave();
 }
 
-async function processRecordedAudio(blob, mimeType) {
+async function processRecordedAudio(blob, mimeType, hadPriorChunks = false) {
   const isClass = sessionMode === 'class';
   $('meetingStatusLabel').textContent = isClass
     ? 'AI sedang menyusun catatan kelas...'
@@ -1182,15 +1255,33 @@ async function processRecordedAudio(blob, mimeType) {
       : '🎧 Spooky sedang mendengarkan rekaman & membuat MoM...'
   );
   try {
-    const base64 = await blobToBase64(blob);
-    const result = isClass
-      ? await api.analyzeClassSession({
+    const base64 = blob ? await blobToBase64(blob) : '';
+    let result;
+    if (isClass) {
+      result = await api.analyzeClassSession({
+        audioBase64: base64,
+        mimeType,
+        transcript: $('transcriptInput').value.trim(),
+        slides: capturedSlides
+      });
+    } else if (hadPriorChunks) {
+      if (base64) {
+        const lastPart = await api.transcribeAudioChunk({
           audioBase64: base64,
           mimeType,
-          transcript: $('transcriptInput').value.trim(),
-          slides: capturedSlides
-        })
-      : await api.analyzeMeetingAudio(base64, mimeType);
+          partNumber: recChunkIndex + 1,
+          isClass: false
+        });
+        if (lastPart && lastPart.success && lastPart.text) {
+          const existing = $('transcriptInput').value.trim();
+          const block = `[Bagian ${recChunkIndex + 1} • Akhir]\n${lastPart.text}`;
+          $('transcriptInput').value = existing ? `${existing}\n\n${block}` : block;
+        }
+      }
+      result = await api.generateMeetingMoM($('transcriptInput').value.trim());
+    } else {
+      result = await api.analyzeMeetingAudio(base64, mimeType);
+    }
     if (result.transcript) {
       const existing = $('transcriptInput').value.trim();
       $('transcriptInput').value = existing
