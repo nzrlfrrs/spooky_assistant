@@ -864,6 +864,7 @@ api.onTaskReminder((r) => {
 // ========================================================
 // NOTULENSI MEETING AI (Audio Capture, Live Wave & MoM)
 // ========================================================
+const MAX_CLASS_SLIDES = 15;
 let sessionMode = 'meeting';
 let audioSourceMode = 'mic';
 let capturedSlides = [];
@@ -1020,10 +1021,15 @@ $('btnCaptureSlide').addEventListener('click', async () => {
     const res = await api.captureScreenSlide();
     if (res && res.success && res.data) {
       capturedSlides.push({ data: res.data, time: res.time });
-      if (capturedSlides.length > 6) capturedSlides = capturedSlides.slice(-6);
+      const dropped = capturedSlides.length > MAX_CLASS_SLIDES;
+      if (dropped) capturedSlides = capturedSlides.slice(-MAX_CLASS_SLIDES);
       renderSlideThumbs();
       playPopSound();
-      toast(`📸 Slide/kode ditangkap (${capturedSlides.length}/6)`);
+      toast(
+        dropped
+          ? `📸 Slide ditangkap (${MAX_CLASS_SLIDES}/${MAX_CLASS_SLIDES} — slide terlama digeser)`
+          : `📸 Slide/kode ditangkap (${capturedSlides.length}/${MAX_CLASS_SLIDES})`
+      );
     } else {
       toast(res?.error || 'Gagal menangkap layar.');
     }

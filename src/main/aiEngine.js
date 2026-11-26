@@ -699,7 +699,7 @@ Hasilkan JSON dengan struktur persis berikut:
       });
     }
     if (Array.isArray(slides) && slides.length) {
-      slides.slice(-6).forEach((s) => {
+      slides.slice(-15).forEach((s) => {
         if (s && s.data) {
           parts.push({
             inline_data: {
@@ -722,7 +722,7 @@ Hasilkan JSON dengan struktur persis berikut:
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(30000)
+          signal: AbortSignal.timeout(60000)
         });
         if (res.ok) {
           const data = await res.json();
