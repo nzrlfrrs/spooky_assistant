@@ -150,10 +150,14 @@ class TaskManager extends EventEmitter {
     const localTasks = this.tasks.filter((t) => !t.fromGCal);
     const mergedGCal = gcalEvents.map((ev) => {
       const prev = existingByUid.get(ev.gcalUid);
+      const prevDesc =
+        prev && prev.description && prev.description.trim() !== 'This is an event reminder'
+          ? prev.description
+          : '';
       return {
         id: prev ? prev.id : 'gcal-' + Buffer.from(ev.gcalUid).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 14),
         title: ev.title,
-        description: ev.description || (prev ? prev.description || '' : ''),
+        description: ev.description || prevDesc,
         date: ev.date,
         time: ev.time || '09:00',
         priority: prev ? prev.priority : 'medium',
