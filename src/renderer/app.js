@@ -854,8 +854,10 @@ setInterval(() => { if (mode === 'expanded') { renderHero(); renderTasks(); } up
 // Pengingat dari backend
 api.onTaskReminder((r) => {
   playReminderSound();
+  const label = r.type === 'briefing' ? 'REKAP JADWAL' : 'PENGINGAT';
+  const duration = r.count > 1 || r.type === 'briefing' ? 14000 : 10000;
   speakText(r.message, null, () => {
-    if (mode === 'compact') showBubble(r.message, 'PENGINGAT', 10000);
+    if (mode === 'compact') showBubble(r.message, label, duration);
     else toast(r.message);
   });
   loadTasks();

@@ -183,33 +183,101 @@ class TaskManager extends EventEmitter {
 
   checkDeadlines() {
     const now = new Date();
+    const urgentTasks = [];
+    const overdueTasks = [];
+
     this.tasks.forEach((t) => {
-      if (t.completed) return;
-      if (!t.date) return;
+      if (t.completed || !t.date) return;
 
       const dueDateTime = new Date(`${t.date}T${t.time || '23:59'}:00`);
-      const diffMs = dueDateTime.getTime() - now.getTime();
-      const diffMinutes = Math.round(diffMs / 60000);
+      if (isNaN(dueDateTime.getTime())) return;
+      const diffMinutes = Math.round((dueDateTime.getTime() - now.getTime()) / 60000);
 
-      // Trigger reminder if due within 30 minutes, or overdue within the last 5 minutes
       if (diffMinutes > 0 && diffMinutes <= 30 && !t.notified30m) {
         t.notified30m = true;
-        this.emit('reminder', {
-          task: t,
-          message: `Tugas "${t.title}" deadline ${diffMinutes} menit lagi lho! 👻⏰`,
-          type: 'urgent'
-        });
-        this.saveToFile();
-      } else if (diffMinutes <= 0 && diffMinutes >= -5 && !t.notifiedOverdue) {
+        urgentTasks.push({ task: t, diffMinutes });
+      } else if (diffMinutes <= 0 && diffMinutes >= -1440 && !t.notifiedOverdue) {
         t.notifiedOverdue = true;
-        this.emit('reminder', {
-          task: t,
-          message: `Tugas "${t.title}" sudah melewati batas waktu deadline! 👻⚠️`,
-          type: 'overdue'
-        });
-        this.saveToFile();
+        overdueTasks.push(t);
       }
     });
+
+    if (!urgentTasks.length && !overdueTasks.length) return false;
+    this.saveToFile();
+
+    const formatTitles = (list) => {
+      const shown = list.slice(0, 3).map((t) => `"${t.title}"`).join(', ');
+      return list.length > 3 ? `${shown}, +${list.length - 3} lainnya` : shown;
+    };
+
+    if (urgentTasks.length === 1) {
+      const { task, diffMinutes } = urgentTasks[0];
+      this.emit('reminder', {
+        task,
+        count: 1,
+        message: `Tugas "${task.title}" deadline ${diffMinutes} menit lagi lho! 👻⏰`,
+        type: 'urgent'
+      });
+    } else if (urgentTasks.length > 1) {
+      const minLeft = Math.min(...urgentTasks.map((u) => u.diffMinutes));
+      this.emit('reminder', {
+        count: urgentTasks.length,
+        message: `Ada ${urgentTasks.length} deadline ${minLeft} menit lagi: ${formatTitles(urgentTasks.map((u) => u.task))}! 👻⏰`,
+        type: 'urgent'
+      });
+    }
+
+    if (overdueTasks.length === 1) {
+      const task = overdueTasks[0];
+      this.emit('reminder', {
+        task,
+        count: 1,
+        message: `Tugas "${task.title}" sudah melewati batas waktu deadline! 👻⚠️`,
+        type: 'overdue'
+      });
+    } else if (overdueTasks.length > 1) {
+      this.emit('reminder', {
+        count: overdueTasks.length,
+        message: `Ada ${overdueTasks.length} deadline terlewat hari ini: ${formatTitles(overdueTasks)}! 👻⚠️`,
+        type: 'overdue'
+      });
+    }
+
+    return true;
+  }
+
+  emitDailyBriefing() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const toYmd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const todayStr = toYmd(now);
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const tomorrowStr = toYmd(tomorrow);
+
+    const todayTasks = this.tasks.filter((t) => !t.completed && t.date === todayStr);
+    const tomorrowTasks = this.tasks.filter((t) => !t.completed && t.date === tomorrowStr);
+    if (!todayTasks.length && !tomorrowTasks.length) return false;
+
+    const preview = (list) => {
+      const names = list.slice(0, 2).map((t) => `"${t.title}"`).join(', ');
+      return list.length > 2 ? `${names}, +${list.length - 2} lainnya` : names;
+    };
+
+    let message = '';
+    if (todayTasks.length && tomorrowTasks.length) {
+      message = `Rekap jadwal: hari ini ada ${todayTasks.length} tugas (${preview(todayTasks)}) dan besok ada ${tomorrowTasks.length} deadline menanti! 👻📋`;
+    } else if (todayTasks.length) {
+      message = `Rekap hari ini: ada ${todayTasks.length} tugas (${preview(todayTasks)})! 👻📋`;
+    } else {
+      message = `Pengingat H-1: besok ada ${tomorrowTasks.length} deadline (${preview(tomorrowTasks)}), siap-siap ya! 👻📅`;
+    }
+
+    this.emit('reminder', {
+      count: todayTasks.length + tomorrowTasks.length,
+      message,
+      type: 'briefing'
+    });
+    return true;
   }
 }
 

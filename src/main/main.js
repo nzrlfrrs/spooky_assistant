@@ -73,6 +73,13 @@ function createWindow() {
       mainWindow.webContents.send('task-reminder', reminder);
     }
   });
+  mainWindow.webContents.once('did-finish-load', () => {
+    setTimeout(() => {
+      if (!taskManager) return;
+      const emitted = taskManager.checkDeadlines();
+      if (!emitted) taskManager.emitDailyBriefing();
+    }, 9000);
+  });
 
   // Initialize Jarvis Hands-Free Wake Word Listener ("Spooky")
   jarvis = new JarvisController();
