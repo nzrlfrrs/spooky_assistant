@@ -36,8 +36,11 @@ contextBridge.exposeInMainWorld('ghostAPI', {
   generateMeetingMoM: (transcript) => ipcRenderer.invoke('meeting-generate-mom', transcript),
   analyzeMeetingAudio: (audioBase64, mimeType) =>
     ipcRenderer.invoke('meeting-analyze-audio', { audioBase64, mimeType }),
-  saveMeetingFile: (markdown, filename) =>
-    ipcRenderer.invoke('meeting-save-file', { markdown, filename }),
+  saveMeetingFile: (markdown, filename, folder = 'notulensi') =>
+    ipcRenderer.invoke('meeting-save-file', { markdown, filename, folder }),
+  captureScreenSlide: () => ipcRenderer.invoke('capture-screen-slide'),
+  analyzeClassSession: (payload) => ipcRenderer.invoke('class-analyze-session', payload),
+  explainClassNow: (contextText = '') => ipcRenderer.invoke('class-explain-now', contextText),
   openFilePath: (filePath) => ipcRenderer.invoke('open-file-path', filePath),
   showFileInFolder: (filePath) => ipcRenderer.invoke('show-file-in-folder', filePath),
 

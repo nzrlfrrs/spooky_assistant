@@ -629,6 +629,172 @@ Format JSON wajib:
     return null;
   }
 
+  static async analyzeClassSession({ audioBase64 = '', mimeType = 'audio/webm', transcript = '', slides = [] }) {
+    const config = ConfigManager.getConfig();
+    const apiKey = config.geminiApiKey ? config.geminiApiKey.trim() : '';
+
+    if (!apiKey) {
+      return {
+        error: true,
+        title: 'Catatan Kelas',
+        summary: 'Gemini API Key belum diatur di Tab Pengaturan.',
+        transcript: transcript || '',
+        concepts: [],
+        codeAndSlides: [],
+        assignments: [],
+        quiz: []
+      };
+    }
+
+    if (!audioBase64 && !transcript.trim() && (!slides || !slides.length)) {
+      return {
+        error: true,
+        title: 'Catatan Kelas',
+        summary: 'Belum ada rekaman suara, slide yang ditangkap, atau teks materi.',
+        transcript: '',
+        concepts: [],
+        codeAndSlides: [],
+        assignments: [],
+        quiz: []
+      };
+    }
+
+    const prompt = `Kamu adalah asisten belajar mahasiswa yang cerdas dan jago menjelaskan materi kuliah dengan bahasa Indonesia yang jelas dan runtut.
+Analisis seluruh bahan kelas online berikut (rekaman suara dosen, tangkapan layar slide/kode, dan/atau catatan teks) lalu buat Catatan Kuliah terstruktur dalam format JSON murni tanpa markdown:
+${transcript ? `\nCatatan/Transkrip Teks:\n"""\n${transcript}\n"""` : ''}
+
+Hasilkan JSON dengan struktur persis berikut:
+{
+  "title": "Judul topik materi kuliah yang spesifik",
+  "transcript": "Transkrip rapi dari penjelasan dosen jika ada audio, atau kosong jika tidak ada audio",
+  "summary": "Ringkasan materi 2-4 kalimat yang mudah dipahami",
+  "concepts": [
+    "Konsep / istilah penting 1: penjelasan singkat",
+    "Konsep / istilah penting 2: penjelasan singkat"
+  ],
+  "codeAndSlides": [
+    "Penjelasan kode, rumus, atau isi slide yang terlihat di tangkapan layar"
+  ],
+  "assignments": [
+    {
+      "task": "PR, kuis, atau tugas kuliah yang disebutkan",
+      "deadline": "Perkiraan deadline jika disebutkan"
+    }
+  ],
+  "quiz": [
+    {
+      "question": "Pertanyaan latihan untuk menguji pemahaman materi ini",
+      "answer": "Jawaban singkat dan tepat"
+    }
+  ]
+}`;
+
+    const parts = [{ text: prompt }];
+    if (audioBase64) {
+      parts.push({
+        inline_data: {
+          mime_type: mimeType.split(';')[0] || 'audio/webm',
+          data: audioBase64
+        }
+      });
+    }
+    if (Array.isArray(slides) && slides.length) {
+      slides.slice(-6).forEach((s) => {
+        if (s && s.data) {
+          parts.push({
+            inline_data: {
+              mime_type: 'image/jpeg',
+              data: s.data
+            }
+          });
+        }
+      });
+    }
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const body = {
+          contents: [{ role: 'user', parts }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.3, maxOutputTokens: 2048 }
+        };
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(30000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const rawJson = AIEngine.extractText(data);
+          if (rawJson) {
+            const cleaned = rawJson.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+            return JSON.parse(cleaned);
+          }
+        }
+      } catch (err) {
+        console.warn(`[AIEngine] Class session failed on ${model}:`, err.message);
+      }
+    }
+
+    return {
+      error: true,
+      title: 'Catatan Kelas',
+      summary: 'Gagal memproses materi kelas ke Gemini API. Coba lagi sebentar ya.',
+      transcript: transcript || '',
+      concepts: [],
+      codeAndSlides: [],
+      assignments: [],
+      quiz: []
+    };
+  }
+
+  static async explainScreenNow(screenshotBase64, contextText = '') {
+    const config = ConfigManager.getConfig();
+    const apiKey = config.geminiApiKey ? config.geminiApiKey.trim() : '';
+    if (!apiKey || !screenshotBase64) {
+      return 'Belum bisa membaca layar. Pastikan Gemini API Key sudah diisi di Pengaturan ya 👻';
+    }
+
+    const prompt =
+      'Kamu adalah Spooky, teman belajar yang jago menjelaskan materi kuliah/koding dengan bahasa Indonesia santai dan gampang dipahami. ' +
+      'Lihat tangkapan layar kelas online ini (bisa berupa slide, kode, rumus, atau Colab). ' +
+      'Jelaskan inti yang sedang dibahas di layar dalam 3-4 kalimat singkat yang langsung paham (tanpa basa-basi panjang).' +
+      (contextText ? `\nKonteks catatan barusan:\n${contextText.slice(-500)}` : '');
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const body = {
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: 'image/jpeg', data: screenshotBase64 } }
+              ]
+            }
+          ],
+          generationConfig: { maxOutputTokens: 1024, temperature: 0.5 }
+        };
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(15000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const text = AIEngine.extractText(data);
+          if (text) return text;
+        }
+      } catch (err) {
+        console.warn(`[AIEngine] Explain screen failed on ${model}:`, err.message);
+      }
+    }
+    return 'Maaf, gagal membaca layar saat ini. Coba klik lagi sebentar ya 👻';
+  }
+
   static localSmartResponse(query) {
     const q = query.toLowerCase();
     if (q.includes('jadwal') || q.includes('tugas')) {
