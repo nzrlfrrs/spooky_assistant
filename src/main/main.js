@@ -70,6 +70,7 @@ function createWindow() {
   taskManager = new TaskManager(path.join(__dirname, '../../tasks.json'));
   taskManager.on('reminder', (reminder) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
+      if (!mainWindow.isVisible()) mainWindow.show();
       mainWindow.webContents.send('task-reminder', reminder);
     }
   });
@@ -98,6 +99,21 @@ function createWindow() {
   }
 }
 
+function toggleWindowVisibility() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isVisible()) mainWindow.hide();
+  else mainWindow.show();
+}
+
+function resetGhostPosition() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+  const [w, h] = mainWindow.getSize();
+  mainWindow.setPosition(Math.max(0, width - w - 25), Math.max(0, height - h - 25));
+  if (!mainWindow.isVisible()) mainWindow.show();
+}
+
 function updateTrayMenu() {
   if (!tray) return;
   const contextMenu = Menu.buildFromTemplate([
@@ -107,26 +123,49 @@ function updateTrayMenu() {
       label: 'Buka Dashboard',
       click: () => {
         if (mainWindow) {
+          if (!mainWindow.isVisible()) mainWindow.show();
           mainWindow.webContents.send('expand-dashboard');
         }
       }
     },
     {
+      label: 'Sembunyikan / Munculkan (Ctrl+Shift+H)',
+      click: () => toggleWindowVisibility()
+    },
+    {
       label: 'Posisikan ke Pojok Kanan Bawah',
-      click: () => {
-        if (mainWindow) {
-          const primaryDisplay = screen.getPrimaryDisplay();
-          const { width, height } = primaryDisplay.workAreaSize;
-          const [w, h] = mainWindow.getSize();
-          mainWindow.setPosition(Math.max(0, width - w - 25), Math.max(0, height - h - 25));
-        }
-      }
+      click: () => resetGhostPosition()
     },
     { type: 'separator' },
     { label: 'Keluar', click: () => app.quit() }
   ]);
   tray.setContextMenu(contextMenu);
 }
+
+ipcMain.on('ghost-context-menu', (event, isPeeking) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'Buka Dashboard',
+      click: () => mainWindow.webContents.send('expand-dashboard')
+    },
+    {
+      label: isPeeking ? 'Munculkan Penuh' : 'Minggir ke Pinggir (Ngintip)',
+      click: () => mainWindow.webContents.send('toggle-peek')
+    },
+    {
+      label: 'Sembunyikan ke Tray (Ctrl+Shift+H)',
+      click: () => mainWindow.hide()
+    },
+    {
+      label: 'Posisikan ke Pojok Kanan Bawah',
+      click: () => resetGhostPosition()
+    },
+    { type: 'separator' },
+    { label: 'Keluar', click: () => app.quit() }
+  ]);
+  menu.popup({ window: mainWindow });
+});
 
 // Window movement handlers
 ipcMain.handle('get-window-pos', () => {
@@ -387,8 +426,13 @@ app.whenReady().then(() => {
   // Shortcut cadangan global: Ctrl+Shift+S untuk langsung panggil Jarvis dari app mana saja
   globalShortcut.register('CommandOrControl+Shift+S', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
+      if (!mainWindow.isVisible()) mainWindow.show();
       mainWindow.webContents.send('jarvis-wake', { raw: 'HOTKEY' });
     }
+  });
+
+  globalShortcut.register('CommandOrControl+Shift+H', () => {
+    toggleWindowVisibility();
   });
 
   app.on('activate', () => {

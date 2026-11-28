@@ -26,6 +26,9 @@ const tabIndicator = $('tabIndicator');
 // ---------- State ----------
 let mode = 'compact';
 let bubbleTimer = null;
+let idlePeekTimer = null;
+let isIdlePeeking = false;
+const IDLE_PEEK_MS = 10000;
 let isMouseDown = false;
 let isDragging = false;
 let dragStart = { x: 0, y: 0, winX: 0, winY: 0 };
@@ -66,16 +69,58 @@ function timeUsedPct(t) {
 }
 
 // ---------- Click-through window transparan ----------
+function setIdlePeek(active) {
+  isIdlePeeking = !!active;
+  ghostDragArea.classList.toggle('idle-peek', isIdlePeeking);
+}
+
+function scheduleIdlePeek() {
+  clearTimeout(idlePeekTimer);
+  if (mode !== 'compact' || isMouseDown || isDragging) return;
+  if (floatingBubble.style.display !== 'none') return;
+  idlePeekTimer = setTimeout(() => {
+    if (mode === 'compact' && !isMouseDown && !isDragging && floatingBubble.style.display === 'none') {
+      setIdlePeek(true);
+    }
+  }, IDLE_PEEK_MS);
+}
+
+function wakeFromIdlePeek() {
+  clearTimeout(idlePeekTimer);
+  if (isIdlePeeking) setIdlePeek(false);
+}
+
 [ghostDragArea, floatingBubble, dashboardDrawer].forEach((el) => {
-  el.addEventListener('mouseenter', () => api.setIgnoreMouseEvents(false));
+  el.addEventListener('mouseenter', () => {
+    api.setIgnoreMouseEvents(false);
+    wakeFromIdlePeek();
+  });
   el.addEventListener('mouseleave', () => {
-    if (!isMouseDown) api.setIgnoreMouseEvents(true, { forward: true });
+    if (!isMouseDown) {
+      api.setIgnoreMouseEvents(true, { forward: true });
+      scheduleIdlePeek();
+    }
   });
 });
 api.setIgnoreMouseEvents(true, { forward: true });
 
+ghostDragArea.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  api.showGhostContextMenu(isIdlePeeking);
+});
+api.onTogglePeek(() => {
+  if (isIdlePeeking) {
+    wakeFromIdlePeek();
+    scheduleIdlePeek();
+  } else if (mode === 'compact') {
+    clearTimeout(idlePeekTimer);
+    setIdlePeek(true);
+  }
+});
+
 // ---------- Bubble hantu ----------
 function showBubble(text, title = 'SPOOKY', ms = 6000) {
+  wakeFromIdlePeek();
   bubbleTitle.textContent = title;
   bubbleText.textContent = text;
   floatingBubble.style.display = 'block';
@@ -87,7 +132,10 @@ function showSpokenBubble(text, title = 'SPOOKY', ms = 6000) {
 }
 function hideBubble() {
   floatingBubble.style.display = 'none';
-  if (mode === 'compact') api.setIgnoreMouseEvents(true, { forward: true });
+  if (mode === 'compact') {
+    api.setIgnoreMouseEvents(true, { forward: true });
+    scheduleIdlePeek();
+  }
 }
 $('closeBubbleBtn').addEventListener('click', (e) => { e.stopPropagation(); hideBubble(); });
 
@@ -99,12 +147,14 @@ function setMode(next) {
   dashboardDrawer.style.display = expanded ? 'flex' : 'none';
   api.setWindowMode(next);
   if (expanded) {
+    wakeFromIdlePeek();
     hideBubble();
     refreshHeader();
     loadTasks();
     requestAnimationFrame(moveIndicator);
   } else {
     api.setIgnoreMouseEvents(true, { forward: true });
+    scheduleIdlePeek();
   }
 }
 $('collapseDashBtn').addEventListener('click', () => setMode('compact'));
@@ -139,6 +189,8 @@ window.addEventListener('mouseup', (e) => {
   if (wasClick && ghostDragArea.contains(e.target)) {
     playPopSound();
     setMode(mode === 'compact' ? 'expanded' : 'compact');
+  } else if (mode === 'compact') {
+    scheduleIdlePeek();
   }
 });
 
