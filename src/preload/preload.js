@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('ghostAPI', {
     ipcRenderer.on('expand-dashboard', sub);
     return () => ipcRenderer.removeListener('expand-dashboard', sub);
   },
+  showGhostContextMenu: (isPeeking) => ipcRenderer.send('ghost-context-menu', !!isPeeking),
+  onTogglePeek: (callback) => {
+    const sub = () => callback();
+    ipcRenderer.on('toggle-peek', sub);
+    return () => ipcRenderer.removeListener('toggle-peek', sub);
+  },
   closeApp: () => ipcRenderer.send('app-close'),
   minimizeApp: () => ipcRenderer.send('app-minimize'),
   getVersion: () => ipcRenderer.invoke('get-version'),

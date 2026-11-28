@@ -54,6 +54,27 @@ html, body {
   align-items: center;
   position: relative;
   -webkit-app-region: no-drag;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
+}
+
+.ghost-character-drag.idle-peek {
+  transform: translateX(84px) scale(0.84);
+  opacity: 0.45;
+}
+
+.ghost-character-drag.idle-peek .ghost-eye {
+  transform: scaleY(0.55) !important;
+}
+
+.ghost-character-drag.idle-peek .ghost-floor-shadow,
+.ghost-character-drag.idle-peek .ghost-ambient-glow,
+.ghost-character-drag.idle-peek .wisp {
+  opacity: 0.18;
+}
+
+.ghost-character-drag.idle-peek .ghost-quick-chip {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .ghost-character-drag:active {
